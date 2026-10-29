@@ -1,0 +1,2852 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>小紫油电记录</title>
+    <meta name="description" content="小紫油电记录 · 增程车充电加油账本，登录后多端同步" />
+    <meta name="theme-color" content="#3b82f6" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="小紫油电记录" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+    <!-- 本地自带，不依赖 CDN：断网或国内弱网也能正常显示图表 / 导入导出 -->
+    <script src="./vendor/chart-lite.js"></script>
+    <script src="./vendor/xlsx-lite.js"></script>
+    <style>
+        /* ===== 全局重置 & 变量 ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        :root {
+            --primary-e: #3b82f6;
+            --primary-g: #f59e0b;
+            --primary-e-light: #dbeafe;
+            --primary-g-light: #fef3c7;
+            --bg: #f0f2f5;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --text-secondary: #64748b;
+            --shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+            --radius: 16px;
+            --radius-sm: 10px;
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding-bottom: calc(80px + var(--safe-bottom));
+            user-select: none;
+        }
+        /* ===== 顶部 ===== */
+        .app-header {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            color: #fff;
+            padding: 16px 20px 12px;
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            box-shadow: 0 2px 16px rgba(0, 0, 0, 0.15);
+        }
+        .app-header .top-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .app-header .title {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .app-header .title span {
+            font-size: 22px;
+        }
+        .app-header .sub {
+            font-size: 12px;
+            opacity: 0.6;
+            font-weight: 400;
+            margin-top: 0px;
+        }
+        .header-actions {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .header-actions button {
+            background: rgba(255, 255, 255, 0.12);
+            border: none;
+            color: #fff;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .header-actions button:active {
+            background: rgba(255, 255, 255, 0.25);
+        }
+        .header-actions .excel-btn {
+            font-size: 15px;
+            padding: 0 10px;
+            border-radius: 20px;
+            width: auto;
+            gap: 4px;
+        }
+
+        /* ===== 视图切换 Tabs ===== */
+        .view-tabs {
+            display: flex;
+            gap: 4px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+            padding: 3px;
+            margin-top: 10px;
+            flex-shrink: 0;
+        }
+        .view-tabs .tab-btn {
+            border: none;
+            padding: 6px 18px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.6);
+            transition: all 0.25s;
+            flex: 1;
+            text-align: center;
+        }
+        .view-tabs .tab-btn.active {
+            background: #ffffff;
+            color: #1e293b;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+        .view-tabs .tab-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* ===== 汇总卡片 ===== */
+        .summary-card {
+            background: var(--card-bg);
+            margin: -8px 16px 16px;
+            padding: 16px 20px 14px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            position: relative;
+            z-index: 10;
+            transition: all 0.3s;
+        }
+        .summary-card .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .summary-card .total-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        .summary-card .total-amount {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text);
+        }
+        .summary-card .total-amount small {
+            font-size: 16px;
+            font-weight: 400;
+            color: var(--text-secondary);
+            margin-left: 2px;
+        }
+        .summary-card .split {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #f1f5f9;
+        }
+        .summary-card .split-item {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .summary-card .split-item .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .summary-card .split-item .dot.e {
+            background: var(--primary-e);
+        }
+        .summary-card .split-item .dot.g {
+            background: var(--primary-g);
+        }
+        .summary-card .split-item .info {
+            display: flex;
+            flex-direction: column;
+        }
+        .summary-card .split-item .info .label {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .summary-card .split-item .info .value {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .summary-card .split-item .info .value.e {
+            color: var(--primary-e);
+        }
+        .summary-card .split-item .info .value.g {
+            color: var(--primary-g);
+        }
+        .summary-card .record-count {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 10px;
+            text-align: right;
+            border-top: 1px solid #f1f5f9;
+            padding-top: 10px;
+        }
+        /* 年度视图 年份导航 */
+        .year-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 6px;
+            padding-top: 10px;
+            border-top: 1px solid #f1f5f9;
+        }
+        .year-nav .year-label {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .year-nav .nav-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .year-nav .nav-btn:active {
+            background: #f1f5f9;
+        }
+        .year-nav .nav-btn.today-btn {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--primary-e);
+            width: auto;
+            padding: 0 14px;
+            border-radius: 20px;
+            background: var(--primary-e-light);
+        }
+        .year-nav .nav-btn.today-btn:active {
+            background: #bfdbfe;
+        }
+
+        /* ===== 图表卡片 ===== */
+        .chart-card {
+            background: var(--card-bg);
+            margin: 0 16px 16px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 16px 12px 8px;
+        }
+        .chart-card .chart-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            padding-left: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chart-card .chart-title .year-badge {
+            font-size: 13px;
+            font-weight: 400;
+            color: var(--text-secondary);
+            background: #f1f5f9;
+            padding: 2px 12px;
+            border-radius: 12px;
+        }
+        .chart-card .chart-wrapper {
+            position: relative;
+            height: 200px;
+            width: 100%;
+        }
+        .chart-card .chart-wrapper canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+        .chart-card .chart-empty {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 14px;
+            padding: 30px 0;
+        }
+
+        /* ===== 月度日历 ===== */
+        .calendar-wrapper {
+            background: var(--card-bg);
+            margin: 0 16px 16px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 16px 12px 12px;
+        }
+        .calendar-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+            padding: 0 4px;
+        }
+        .calendar-nav .month-label {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .calendar-nav .month-label .year {
+            font-weight: 400;
+            color: var(--text-secondary);
+            font-size: 15px;
+            margin-left: 4px;
+        }
+        .calendar-nav .nav-btn {
+            background: none;
+            border: none;
+            font-size: 22px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .calendar-nav .nav-btn:active {
+            background: #f1f5f9;
+        }
+        .calendar-nav .nav-btn.today-btn {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--primary-e);
+            width: auto;
+            padding: 0 12px;
+            border-radius: 20px;
+            background: var(--primary-e-light);
+        }
+        .calendar-nav .nav-btn.today-btn:active {
+            background: #bfdbfe;
+        }
+
+        .weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            text-align: center;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+        .weekdays span {
+            padding: 4px 0;
+        }
+
+        .days-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+        }
+        .day-cell {
+            aspect-ratio: 1 / 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: background 0.15s;
+            position: relative;
+            background: transparent;
+            min-height: 44px;
+            padding: 2px 0;
+        }
+        .day-cell:active {
+            background: #f1f5f9;
+        }
+        .day-cell.empty {
+            cursor: default;
+            pointer-events: none;
+        }
+        .day-cell.empty:active {
+            background: transparent;
+        }
+        .day-cell.other-month {
+            color: #cbd5e1;
+        }
+        .day-cell.today {
+            background: var(--primary-e-light);
+            color: var(--primary-e);
+            font-weight: 700;
+        }
+        .day-cell.today:active {
+            background: #bfdbfe;
+        }
+        .day-cell .day-number {
+            line-height: 1.2;
+            font-size: 15px;
+        }
+        .day-cell .day-dots {
+            display: flex;
+            gap: 3px;
+            margin-top: 1px;
+            height: 6px;
+            align-items: center;
+            justify-content: center;
+        }
+        .day-cell .day-dots .dot-indicator {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            display: block;
+        }
+        .day-cell .day-dots .dot-indicator.e {
+            background: var(--primary-e);
+        }
+        .day-cell .day-dots .dot-indicator.g {
+            background: var(--primary-g);
+        }
+        /* 新增：积分支付圆点（绿色） */
+        .day-cell .day-dots .dot-indicator.points {
+            background: #22c55e;
+        }
+        .day-cell .day-amount {
+            font-size: 10px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            line-height: 1.2;
+            margin-top: 1px;
+            white-space: nowrap;
+        }
+        .day-cell.has-record .day-amount {
+            color: var(--text);
+        }
+        .day-cell.has-record.electric .day-amount {
+            color: var(--primary-e);
+        }
+        .day-cell.has-record.gas .day-amount {
+            color: var(--primary-g);
+        }
+        .day-cell.has-record.both .day-amount {
+            color: var(--text);
+        }
+
+        /* ===== 年度视图 - 月份列表 ===== */
+        .annual-month-list {
+            margin-top: 4px;
+        }
+        .annual-month-list .month-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            transition: background 0.15s;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .annual-month-list .month-row:active {
+            background: #f8fafc;
+        }
+        .annual-month-list .month-row .month-name {
+            font-weight: 500;
+            font-size: 15px;
+            min-width: 48px;
+        }
+        .annual-month-list .month-row .month-bars {
+            flex: 1;
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            padding: 0 12px;
+            min-width: 60px;
+        }
+        .annual-month-list .month-row .month-bars .bar-track {
+            flex: 1;
+            height: 6px;
+            background: #f1f5f9;
+            border-radius: 4px;
+            overflow: hidden;
+            display: flex;
+            min-width: 40px;
+        }
+        .annual-month-list .month-row .month-bars .bar-track .bar-e {
+            background: var(--primary-e);
+            height: 100%;
+            border-radius: 4px 0 0 4px;
+            transition: width 0.4s;
+        }
+        .annual-month-list .month-row .month-bars .bar-track .bar-g {
+            background: var(--primary-g);
+            height: 100%;
+            border-radius: 0 4px 4px 0;
+            transition: width 0.4s;
+        }
+        .annual-month-list .month-row .month-total {
+            font-weight: 600;
+            font-size: 15px;
+            min-width: 70px;
+            text-align: right;
+        }
+        .annual-month-list .month-row .month-total small {
+            font-weight: 400;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* ===== 年度视图 - 历年汇总 ===== */
+        .yearly-summary-section {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #f1f5f9;
+        }
+        .yearly-summary-section .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+        .yearly-summary-section .yearly-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 8px;
+        }
+        .yearly-summary-section .yearly-item {
+            background: #f8fafc;
+            border-radius: var(--radius-sm);
+            padding: 12px 10px;
+            text-align: center;
+            transition: background 0.15s;
+            cursor: pointer;
+        }
+        .yearly-summary-section .yearly-item:active {
+            background: #f1f5f9;
+        }
+        .yearly-summary-section .yearly-item .y-year {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+        .yearly-summary-section .yearly-item .y-amount {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text);
+            margin-top: 2px;
+        }
+        .yearly-summary-section .yearly-item .y-amount small {
+            font-size: 12px;
+            font-weight: 400;
+            color: var(--text-secondary);
+        }
+        .yearly-summary-section .yearly-item .y-detail {
+            margin-top: 2px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+        .yearly-summary-section .yearly-item .y-detail .e {
+            color: var(--primary-e);
+        }
+        .yearly-summary-section .yearly-item .y-detail .g {
+            color: var(--primary-g);
+        }
+        .yearly-summary-section .empty-yearly {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 14px;
+            padding: 16px 0;
+        }
+
+        /* ===== 底部弹出层 ===== */
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            z-index: 100;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+            backdrop-filter: blur(2px);
+        }
+        .overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .bottom-sheet {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #fff;
+            z-index: 101;
+            border-radius: 24px 24px 0 0;
+            padding: 20px 20px calc(20px + var(--safe-bottom));
+            transform: translateY(100%);
+            transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .bottom-sheet.active {
+            transform: translateY(0);
+        }
+        .bottom-sheet .sheet-handle {
+            width: 40px;
+            height: 4px;
+            background: #d1d5db;
+            border-radius: 4px;
+            margin: 0 auto 16px;
+            flex-shrink: 0;
+        }
+        .bottom-sheet .sheet-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-shrink: 0;
+        }
+        .bottom-sheet .sheet-header .date-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .bottom-sheet .sheet-header .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 8px;
+        }
+        .bottom-sheet .sheet-header .close-btn:active {
+            background: #f1f5f9;
+        }
+
+        .record-list {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 12px;
+            min-height: 80px;
+            max-height: 40vh;
+        }
+        .record-list .empty-msg {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 14px;
+            padding: 28px 0;
+        }
+        .record-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 14px;
+            background: #f8fafc;
+            border-radius: var(--radius-sm);
+            margin-bottom: 8px;
+            transition: background 0.15s;
+        }
+        .record-item:active {
+            background: #f1f5f9;
+        }
+        .record-item .left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+            min-width: 0;
+        }
+        .record-item .left .type-badge {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 2px 12px;
+            border-radius: 20px;
+            flex-shrink: 0;
+        }
+        .record-item .left .type-badge.e {
+            background: var(--primary-e-light);
+            color: var(--primary-e);
+        }
+        .record-item .left .type-badge.g {
+            background: var(--primary-g-light);
+            color: var(--primary-g);
+        }
+        .record-item .left .info-text {
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .record-item .left .info-text .note {
+            color: var(--text-secondary);
+            font-size: 13px;
+            margin-left: 6px;
+        }
+        .record-item .right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+        .record-item .right .amount {
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .record-item .right .amount.e {
+            color: var(--primary-e);
+        }
+        .record-item .right .amount.g {
+            color: var(--primary-g);
+        }
+        .record-item .right .points-mark {
+            font-size: 12px;
+            color: #8b5cf6;
+            background: #ede9fe;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+        .record-item .right .del-btn {
+            background: none;
+            border: none;
+            color: #ef4444;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 6px;
+            opacity: 0.5;
+            transition: opacity 0.2s;
+        }
+        .record-item .right .del-btn:active {
+            opacity: 1;
+            background: #fee2e2;
+        }
+
+        .add-form {
+            flex-shrink: 0;
+            border-top: 1px solid #f1f5f9;
+            padding-top: 16px;
+            background: #fff;
+            border-radius: 0 0 24px 24px;
+        }
+        .add-form .form-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .add-form .form-row .type-toggle {
+            display: flex;
+            gap: 4px;
+            background: #f1f5f9;
+            border-radius: 24px;
+            padding: 3px;
+            flex-shrink: 0;
+        }
+        .add-form .form-row .type-toggle button {
+            border: none;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            background: transparent;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+        .add-form .form-row .type-toggle button.active-e {
+            background: var(--primary-e);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+        }
+        .add-form .form-row .type-toggle button.active-g {
+            background: var(--primary-g);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+        }
+        .add-form .form-row .type-toggle button:active {
+            transform: scale(0.95);
+        }
+        .add-form .form-row .amount-input {
+            flex: 1;
+            min-width: 80px;
+            padding: 8px 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 20px;
+            font-size: 15px;
+            font-weight: 500;
+            outline: none;
+            background: #fff;
+            transition: border 0.2s;
+        }
+        .add-form .form-row .amount-input:focus {
+            border-color: var(--primary-e);
+        }
+        .add-form .form-row .amount-input::placeholder {
+            color: #cbd5e1;
+            font-weight: 400;
+        }
+        .add-form .form-row .points-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+        .add-form .form-row .points-checkbox input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #8b5cf6;
+            cursor: pointer;
+        }
+        .add-form .form-row .points-checkbox.is-disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .add-form .form-row .points-checkbox.is-disabled input[type="checkbox"] {
+            cursor: not-allowed;
+        }
+        .add-form .form-row .note-input {
+            flex: 1;
+            min-width: 60px;
+            padding: 8px 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 20px;
+            font-size: 14px;
+            outline: none;
+            background: #fff;
+            transition: border 0.2s;
+        }
+        .add-form .form-row .note-input:focus {
+            border-color: var(--primary-e);
+        }
+        .add-form .form-row .note-input::placeholder {
+            color: #cbd5e1;
+        }
+        .add-form .form-row .submit-btn {
+            padding: 8px 18px;
+            border: none;
+            border-radius: 24px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+            background: var(--primary-e);
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            flex-shrink: 0;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+        }
+        .add-form .form-row .submit-btn:active {
+            transform: scale(0.95);
+        }
+        .add-form .form-row .submit-btn.gas-mode {
+            background: var(--primary-g);
+            box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+        }
+
+        /* ===== 浮动按钮 ===== */
+        .fab {
+            position: fixed;
+            right: 20px;
+            bottom: calc(24px + var(--safe-bottom));
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: #fff;
+            border: none;
+            font-size: 30px;
+            box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
+            cursor: pointer;
+            z-index: 50;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .fab:active {
+            transform: scale(0.9);
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+        }
+
+        /* ===== Toast ===== */
+        .toast {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            background: #1e293b;
+            color: #fff;
+            padding: 10px 24px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            z-index: 200;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+        .toast.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* ===== 响应式 ===== */
+        @media (max-width: 420px) {
+            .summary-card .total-amount {
+                font-size: 24px;
+            }
+            .summary-card .split-item .info .value {
+                font-size: 16px;
+            }
+            .day-cell {
+                font-size: 14px;
+                min-height: 38px;
+            }
+            .day-cell .day-dots .dot-indicator {
+                width: 5px;
+                height: 5px;
+            }
+            .day-cell .day-amount {
+                font-size: 9px;
+            }
+            .add-form .form-row {
+                gap: 6px;
+            }
+            .add-form .form-row .amount-input,
+            .add-form .form-row .note-input {
+                font-size: 14px;
+                padding: 6px 10px;
+            }
+            .add-form .form-row .points-checkbox {
+                font-size: 12px;
+            }
+            .add-form .form-row .submit-btn {
+                padding: 6px 14px;
+                font-size: 13px;
+            }
+            .bottom-sheet {
+                padding: 16px 16px calc(16px + var(--safe-bottom));
+            }
+            .chart-card .chart-wrapper {
+                height: 160px;
+            }
+            .view-tabs .tab-btn {
+                font-size: 12px;
+                padding: 5px 12px;
+            }
+            .annual-month-list .month-row {
+                padding: 8px 6px;
+                flex-wrap: wrap;
+                gap: 4px;
+            }
+            .annual-month-list .month-row .month-bars {
+                padding: 0 6px;
+                min-width: 40px;
+            }
+            .annual-month-list .month-row .month-total {
+                font-size: 14px;
+                min-width: 60px;
+            }
+            .yearly-summary-section .yearly-grid {
+                grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+            }
+            .header-actions .excel-btn {
+                font-size: 12px;
+                padding: 0 8px;
+                height: 32px;
+            }
+        }
+        @media (min-width: 600px) {
+            body {
+                max-width: 480px;
+                margin: 0 auto;
+                background: #e8ecf1;
+            }
+            .app-header {
+                border-radius: 0 0 20px 20px;
+            }
+            .summary-card {
+                border-radius: var(--radius);
+            }
+            .chart-card {
+                border-radius: var(--radius);
+            }
+            .calendar-wrapper {
+                border-radius: var(--radius);
+            }
+            .bottom-sheet {
+                max-width: 480px;
+                left: 50%;
+                transform: translateX(-50%) translateY(100%);
+                border-radius: 24px 24px 0 0;
+            }
+            .bottom-sheet.active {
+                transform: translateX(-50%) translateY(0);
+            }
+            .fab {
+                right: calc(50% - 240px + 20px);
+            }
+        }
+
+        .record-list::-webkit-scrollbar {
+            width: 4px;
+        }
+        .record-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .record-list::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 4px;
+        }
+
+        /* ===== 视图切换容器 ===== */
+        .view-container {
+            display: block;
+        }
+        .view-container.hidden {
+            display: none !important;
+        }
+
+        /* 年度视图内滚动 */
+        .annual-scroll {
+            max-height: 420px;
+            overflow-y: auto;
+            padding-right: 2px;
+        }
+        .annual-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+        .annual-scroll::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 4px;
+        }
+
+        .hidden-input {
+            position: absolute;
+            width: 0;
+            height: 0;
+            opacity: 0;
+            pointer-events: none;
+        }
+/* ================================================================
+   多端同步 · 登录与账号界面（新增，不改动原有样式）
+   ================================================================ */
+
+/* ---- 顶栏：为账号按钮腾出空间，防止标题与按钮挤成两行 ---- */
+.app-header .top-row {
+    gap: 8px;
+}
+.app-header .top-row > div:first-child {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+.app-header .title {
+    font-size: 19px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.header-actions {
+    flex: 0 0 auto;
+    gap: 5px;
+}
+.header-actions button {
+    width: 32px;
+    height: 32px;
+    font-size: 15px;
+}
+.header-actions .excel-btn {
+    padding: 0 9px;
+    height: 32px;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+/* 手机竖屏：只留图标，点按有 title 提示 */
+@media (max-width: 599px) {
+    .header-actions .btn-label {
+        display: none;
+    }
+    .header-actions .excel-btn {
+        padding: 0 8px;
+    }
+}
+
+/* ---- 顶栏账号按钮 + 同步状态点 ---- */
+.acct-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+}
+.sync-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+    background: #94a3b8;
+    flex: 0 0 auto;
+}
+.sync-dot.ok { background: #22c55e; }
+.sync-dot.syncing { background: #f59e0b; animation: dotPulse 1s infinite; }
+.sync-dot.error { background: #ef4444; }
+.sync-dot.offline { background: #94a3b8; }
+@keyframes dotPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+/* ---- 登录 / 注册 ---- */
+.login-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: linear-gradient(165deg, #e8f0fe 0%, #f8fafc 42%, #fef3c7 100%);
+    overflow-y: auto;
+}
+.login-screen.hidden { display: none; }
+
+.login-card {
+    width: 100%;
+    max-width: 352px;
+    background: #fff;
+    border-radius: 22px;
+    box-shadow: 0 12px 44px rgba(15, 23, 42, 0.14);
+    padding: 26px 22px 20px;
+    animation: cardIn 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes cardIn {
+    from { opacity: 0; transform: translateY(14px) scale(0.98); }
+    to { opacity: 1; transform: none; }
+}
+
+.login-logo { font-size: 40px; text-align: center; line-height: 1; }
+.login-title {
+    text-align: center;
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 10px 0 3px;
+}
+.login-sub {
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    margin-bottom: 18px;
+}
+
+.login-tabs {
+    display: flex;
+    background: #f1f5f9;
+    border-radius: 12px;
+    padding: 3px;
+    margin-bottom: 16px;
+}
+.login-tabs button {
+    flex: 1;
+    border: 0;
+    background: transparent;
+    padding: 9px 0;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.18s;
+}
+.login-tabs button.active {
+    background: #fff;
+    color: var(--primary-e);
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
+}
+
+.field { margin-bottom: 12px; }
+.field label {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+.field input {
+    width: 100%;
+    border: 1.5px solid #e2e8f0;
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 11px 13px;
+    font-size: 15px;
+    color: var(--text);
+    font-family: inherit;
+    outline: none;
+    transition: all 0.18s;
+    user-select: text;
+    -webkit-user-select: text;
+}
+.field input:focus {
+    border-color: var(--primary-e);
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.login-error {
+    min-height: 17px;
+    font-size: 12.5px;
+    color: #ef4444;
+    margin: 2px 2px 8px;
+    line-height: 1.4;
+}
+.login-submit {
+    width: 100%;
+    border: 0;
+    border-radius: 13px;
+    padding: 13px;
+    font-size: 15.5px;
+    font-weight: 700;
+    color: #fff;
+    font-family: inherit;
+    background: linear-gradient(135deg, #3b82f6, #6366f1);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.32);
+    cursor: pointer;
+    transition: transform 0.12s, opacity 0.15s;
+}
+.login-submit:active { transform: scale(0.98); }
+.login-submit:disabled { opacity: 0.6; }
+.login-foot {
+    font-size: 11.5px;
+    color: #94a3b8;
+    text-align: center;
+    margin-top: 14px;
+    line-height: 1.7;
+}
+
+/* ---- 账号面板 ---- */
+.acct-mask {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    z-index: 150;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+}
+.acct-mask.show { opacity: 1; pointer-events: auto; }
+
+.acct-panel {
+    position: fixed;
+    left: 50%;
+    bottom: 0;
+    width: 100%;
+    max-width: 460px;
+    transform: translate(-50%, 110%);
+    background: #fff;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.18);
+    z-index: 151;
+    padding: 8px 18px calc(18px + var(--safe-bottom));
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.acct-panel.show { transform: translate(-50%, 0); }
+.acct-grab {
+    width: 38px;
+    height: 4px;
+    border-radius: 2px;
+    background: #e2e8f0;
+    margin: 6px auto 12px;
+}
+.acct-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+.acct-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #3b82f6, #6366f1);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 700;
+    flex: 0 0 auto;
+    text-transform: uppercase;
+}
+.acct-name { font-size: 16px; font-weight: 700; color: var(--text); }
+.acct-meta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+.acct-list {
+    background: #f8fafc;
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 14px;
+}
+.acct-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    font-size: 14px;
+    color: var(--text);
+    border-bottom: 1px solid #eef2f7;
+}
+.acct-item:last-child { border-bottom: 0; }
+.acct-item .k { color: var(--text-secondary); font-size: 13px; }
+.acct-item .v { font-weight: 600; }
+
+.acct-actions { display: grid; gap: 9px; }
+.acct-act {
+    border: 0;
+    border-radius: 13px;
+    padding: 12px;
+    font-size: 14.5px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+.acct-act:active { opacity: 0.75; }
+.acct-act.primary { background: #eff6ff; color: #2563eb; }
+.acct-act.danger { background: #fef2f2; color: #dc2626; }
+.acct-act.ghost { background: #f1f5f9; color: #475569; }
+
+.acct-pwd {
+    display: none;
+    background: #f8fafc;
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 12px;
+}
+.acct-pwd.show { display: block; }
+.acct-hint {
+    font-size: 11.5px;
+    color: #94a3b8;
+    text-align: center;
+    margin-top: 12px;
+    line-height: 1.6;
+}
+    </style>
+</head>
+<body>
+
+<!-- ===== 登录 / 注册（新增） ===== -->
+<div class="login-screen hidden" id="loginScreen">
+    <div class="login-card">
+        <div class="login-logo">🚘</div>
+        <div class="login-title">小紫油电记录</div>
+        <div class="login-sub">登录后手机和电脑自动同步</div>
+
+        <div class="login-tabs" id="authTabs">
+            <button data-mode="login" class="active">登录</button>
+            <button data-mode="register">注册</button>
+        </div>
+
+        <div class="field">
+            <label for="authUser">账号</label>
+            <input id="authUser" type="text" autocomplete="username" placeholder="3-24 位字母、数字或中文" autocapitalize="none" spellcheck="false" />
+        </div>
+        <div class="field">
+            <label for="authPass">密码</label>
+            <input id="authPass" type="password" autocomplete="current-password" placeholder="至少 6 位" />
+        </div>
+        <div class="field" id="authPass2Field" style="display:none;">
+            <label for="authPass2">确认密码</label>
+            <input id="authPass2" type="password" autocomplete="new-password" placeholder="再输一次" />
+        </div>
+
+        <div class="login-error" id="authError"></div>
+        <button class="login-submit" id="authSubmit">登 录</button>
+
+        <div class="login-foot" id="authFoot">
+            同一账号在手机、电脑登录后，记录自动互通<br />数据只存在你自己的服务器上
+        </div>
+    </div>
+</div>
+
+<!-- ===== 账号面板（新增） ===== -->
+<div class="acct-mask" id="acctMask"></div>
+<div class="acct-panel" id="acctPanel">
+    <div class="acct-grab"></div>
+    <div class="acct-head">
+        <div class="acct-avatar" id="acctAvatar">U</div>
+        <div>
+            <div class="acct-name" id="acctName">未登录</div>
+            <div class="acct-meta" id="acctMeta">离线</div>
+        </div>
+    </div>
+
+    <div class="acct-list">
+        <div class="acct-item">
+            <span class="k">同步状态</span>
+            <span class="v" id="acctStatus">—</span>
+        </div>
+        <div class="acct-item">
+            <span class="k">上次同步</span>
+            <span class="v" id="acctLast">从未</span>
+        </div>
+        <div class="acct-item">
+            <span class="k">本机记录</span>
+            <span class="v" id="acctCount">0 条</span>
+        </div>
+    </div>
+
+    <div class="acct-pwd" id="acctPwdBox">
+        <div class="field" style="display:none;">
+            <label for="pwdOld">原密码</label>
+            <input id="pwdOld" type="password" autocomplete="current-password" />
+        </div>
+        <div class="field">
+            <label for="pwdNew">新密码</label>
+            <input id="pwdNew" type="password" autocomplete="new-password" />
+        </div>
+        <div class="login-error" id="pwdError"></div>
+        <div class="acct-actions">
+            <button class="acct-act primary" id="pwdSave">保存新密码</button>
+        </div>
+    </div>
+
+    <div class="acct-actions">
+        <button class="acct-act primary" id="acctSync">立即同步</button>
+        <button class="acct-act ghost" id="acctSetup">服务器设置</button>
+        <button class="acct-act ghost" id="acctPwdBtn">修改密码</button>
+        <button class="acct-act danger" id="acctLogout">退出登录</button>
+    </div>
+
+    <div class="acct-hint">
+        离线也能记录，联网后自动同步；换手机登录同一账号即可看到全部数据
+    </div>
+</div>
+
+    <!-- ===== 顶部 ===== -->
+    <header class="app-header">
+        <div class="top-row">
+            <div>
+                <div class="title"><span>🚘</span> 小紫油电记录</div>
+                <div class="sub">记录 · 洞察 · 节约</div>
+            </div>
+            <div class="header-actions">
+                <button class="excel-btn acct-btn" id="acctBtn" title="账号与同步"><span class="sync-dot" id="syncDot"></span>👤</button>
+                <button class="excel-btn" id="exportExcelBtn" title="导出Excel">📤<span class="btn-label">导出</span></button>
+                <button class="excel-btn" id="importExcelBtn" title="导入Excel">📥<span class="btn-label">导入</span></button>
+                <button id="clearAllBtn" title="清除所有数据">🗑</button>
+            </div>
+        </div>
+        <div class="view-tabs" id="viewTabs">
+            <button class="tab-btn active" data-view="monthly">📊 月度视图</button>
+            <button class="tab-btn" data-view="annual">📈 年度汇总</button>
+        </div>
+        <input type="file" id="fileInput" class="hidden-input" accept=".xlsx,.xls,.csv" />
+    </header>
+
+    <!-- ===== 汇总卡片 ===== -->
+    <div class="summary-card" id="summaryCard">
+        <div id="summaryMonthly">
+            <div class="row">
+                <span class="total-label">本月总花费</span>
+                <span class="total-amount" id="totalAmount">¥0.00</span>
+            </div>
+            <div class="split">
+                <div class="split-item">
+                    <span class="dot e"></span>
+                    <div class="info">
+                        <span class="label">电费</span>
+                        <span class="value e" id="electricTotal">¥0.00</span>
+                    </div>
+                </div>
+                <div class="split-item">
+                    <span class="dot g"></span>
+                    <div class="info">
+                        <span class="label">油费</span>
+                        <span class="value g" id="gasTotal">¥0.00</span>
+                    </div>
+                </div>
+            </div>
+            <div class="record-count" id="recordCount">共 0 条记录</div>
+        </div>
+        <div id="summaryAnnual" style="display:none;">
+            <div class="row">
+                <span class="total-label">全年总花费</span>
+                <span class="total-amount" id="annualTotalAmount">¥0.00</span>
+            </div>
+            <div class="split">
+                <div class="split-item">
+                    <span class="dot e"></span>
+                    <div class="info">
+                        <span class="label">电费</span>
+                        <span class="value e" id="annualElectricTotal">¥0.00</span>
+                    </div>
+                </div>
+                <div class="split-item">
+                    <span class="dot g"></span>
+                    <div class="info">
+                        <span class="label">油费</span>
+                        <span class="value g" id="annualGasTotal">¥0.00</span>
+                    </div>
+                </div>
+            </div>
+            <div class="year-nav">
+                <button class="nav-btn" id="prevYearBtn">‹</button>
+                <span class="year-label" id="yearLabel">2026年</span>
+                <div style="display:flex;gap:4px;">
+                    <button class="nav-btn today-btn" id="thisYearBtn">今年</button>
+                    <button class="nav-btn" id="nextYearBtn">›</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 图表卡片 ===== -->
+    <div class="chart-card" id="chartCard">
+        <div class="chart-title" id="chartTitle">
+            <span>📈 每日花费趋势</span>
+        </div>
+        <div class="chart-wrapper" id="chartWrapper">
+            <canvas id="trendChart"></canvas>
+        </div>
+        <div class="chart-empty" id="chartEmpty" style="display:none;">暂无数据，添加记录后趋势图将自动生成</div>
+    </div>
+
+    <!-- ===== 月度日历 ===== -->
+    <div class="calendar-wrapper view-container" id="monthlyView">
+        <div class="calendar-nav">
+            <button class="nav-btn" id="prevMonth">‹</button>
+            <span class="month-label" id="monthLabel">2026年8月</span>
+            <div style="display:flex;gap:4px;">
+                <button class="nav-btn today-btn" id="todayBtn">今天</button>
+                <button class="nav-btn" id="nextMonth">›</button>
+            </div>
+        </div>
+        <div class="weekdays">
+            <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+        </div>
+        <div class="days-grid" id="daysGrid"></div>
+    </div>
+
+    <!-- ===== 年度视图 ===== -->
+    <div class="calendar-wrapper view-container hidden" id="annualView">
+        <div style="margin-bottom:6px;font-size:14px;font-weight:600;color:var(--text-secondary);padding:0 4px;">
+            📋 每月花费明细
+        </div>
+        <div class="annual-scroll" id="annualScroll">
+            <div class="annual-month-list" id="annualMonthList"></div>
+            <div class="yearly-summary-section" id="yearlySummarySection">
+                <div class="section-title">📊 历年汇总</div>
+                <div id="yearlyGridContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 浮动按钮 ===== -->
+    <button class="fab" id="fabAdd">+</button>
+
+    <!-- ===== Toast ===== -->
+    <div class="toast" id="toast"></div>
+
+    <!-- ===== 遮罩 ===== -->
+    <div class="overlay" id="overlay"></div>
+
+    <!-- ===== 底部弹出层 ===== -->
+    <div class="bottom-sheet" id="bottomSheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+            <span class="date-title" id="sheetDate">2026年8月6日</span>
+            <button class="close-btn" id="sheetClose">✕</button>
+        </div>
+        <div class="record-list" id="recordList">
+            <div class="empty-msg">📭 当天暂无记录</div>
+        </div>
+        <div class="add-form">
+            <div class="form-row">
+                <div class="type-toggle" id="typeToggle">
+                    <button class="active-e" data-type="electric">⚡ 充电</button>
+                    <button data-type="gas">⛽ 加油</button>
+                </div>
+                <input class="amount-input" id="inputAmount" type="number" step="0.01" placeholder="金额" inputmode="decimal" />
+                <label class="points-checkbox" id="pointsLabel">
+                    <input type="checkbox" id="usePoints" /> 🎫 积分
+                </label>
+                <input class="note-input" id="inputNote" type="text" placeholder="备注（选填）" maxlength="20" />
+                <button class="submit-btn" id="submitRecord">添加</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ================================================================
+        //  数据层
+        // ================================================================
+        // 旧版本用过的键名，登录后可作为「旧数据」导入
+        const LEGACY_KEY = 'hybrid_energy_records';
+
+        // 当前登录账号（未登录为 null）；由 auth-sync.js 设置
+        let currentUser = null;
+
+        // 和服务端的同步游标（只增不减的序号，避免依赖设备时钟）
+        let syncSeq = 0;
+
+        /**
+         * 本地库：按账号隔离，账号之间互不串数据。
+         * 每条记录带 updatedAt（客户端修改时间，用于冲突判定）、dirty（待上传）、deleted（删除墓碑）。
+         */
+        const DB = {
+            /**
+             * 用「账号名」而不是用户 id 做本地存储键。
+             * 这样即使云端数据库被重建、需要重新注册同名账号，本机数据依然接得上，
+             * 配合服务端序号回退检测可以自动把数据补回云端。
+             */
+            key() {
+                const who = currentUser ? String(currentUser.username || '').toLowerCase() : 'guest';
+                return 'er_v2_u_' + who.replace(/[^\w\u4e00-\u9fa5.@+-]/g, '_');
+            },
+            seqKey() {
+                return this.key() + '_seq';
+            },
+            lastKey() {
+                return this.key() + '_last';
+            },
+            all() {
+                try {
+                    const raw = localStorage.getItem(this.key());
+                    if (raw) {
+                        const d = JSON.parse(raw);
+                        if (d && Array.isArray(d.records)) return d.records;
+                    }
+                } catch (e) {
+                    console.warn('本地数据读取失败', e);
+                }
+                return [];
+            },
+            saveAll(arr) {
+                try {
+                    localStorage.setItem(this.key(), JSON.stringify({ v: 2, records: arr }));
+                } catch (e) {
+                    console.warn('本地数据写入失败', e);
+                    showToast('⚠️ 本地存储空间不足');
+                }
+            },
+            visible() {
+                return this.all().filter(r => !r.deleted);
+            },
+            /** 上传成功后清除脏标记；期间又被改过的保持脏，等下一轮 */
+            markClean(sentMap) {
+                const all = this.all();
+                all.forEach(r => {
+                    if (sentMap.has(r.id) && sentMap.get(r.id) === r.updatedAt) r.dirty = 0;
+                });
+                this.saveAll(all);
+            },
+            /** 全部标记为待上传（服务端数据丢失时的自愈） */
+            markAllDirty() {
+                const all = this.all();
+                const now = Date.now();
+                all.forEach(r => {
+                    r.dirty = 1;
+                    r.updatedAt = now + Math.floor(Math.random() * 1000);
+                });
+                this.saveAll(all);
+            },
+        };
+
+        function loadRecords() {
+            return DB.visible();
+        }
+
+        /**
+         * 保存可见记录列表。行为：
+         *  - 新记录 / 内容变化的记录 → 打上 updatedAt 与 dirty，等待同步
+         *  - 从列表里消失的记录 → 变成删除墓碑（否则同步时会被别的设备「复活」）
+         */
+        function saveRecords(list) {
+            const prev = DB.all();
+            const prevMap = new Map(prev.map(r => [r.id, r]));
+            const now = Date.now();
+            const alive = [];
+            const seen = new Set();
+
+            (list || []).forEach(r => {
+                if (!r || !r.id) return;
+                seen.add(r.id);
+                const p = prevMap.get(r.id);
+                const changed = !p ||
+                    p.date !== r.date ||
+                    p.type !== r.type ||
+                    Number(p.amount) !== Number(r.amount) ||
+                    (p.note || '') !== (r.note || '') ||
+                    !!p.usePoints !== !!r.usePoints;
+                alive.push({
+                    id: r.id,
+                    date: r.date,
+                    type: r.type,
+                    amount: Number(r.amount) || 0,
+                    note: r.note || '',
+                    usePoints: !!r.usePoints,
+                    createTime: r.createTime || (p && p.createTime) || now,
+                    updatedAt: changed ? now : (p.updatedAt || now),
+                    dirty: changed ? 1 : (p.dirty || 0),
+                    deleted: 0,
+                });
+            });
+
+            // 原来存在、现在不见了 → 删除墓碑
+            prev.forEach(p => {
+                if (p.deleted || seen.has(p.id)) return;
+                alive.push({
+                    id: p.id,
+                    date: p.date,
+                    type: p.type,
+                    amount: Number(p.amount) || 0,
+                    note: p.note || '',
+                    usePoints: !!p.usePoints,
+                    createTime: p.createTime || now,
+                    updatedAt: now,
+                    dirty: 1,
+                    deleted: 1,
+                });
+            });
+
+            DB.saveAll(alive);
+            records = alive.filter(r => !r.deleted);
+            if (typeof scheduleSync === 'function') scheduleSync(1200);
+        }
+
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        }
+
+        // ================================================================
+        //  状态
+        // ================================================================
+        let records = loadRecords();
+        let currentYear = new Date().getFullYear();
+        let currentMonth = new Date().getMonth();
+        let selectedDate = null;
+        let currentType = 'electric';
+        let chartInstance = null;
+        let viewMode = 'monthly';
+        let annualYear = new Date().getFullYear();
+
+        const $ = (s) => document.querySelector(s);
+        const $$ = (s) => document.querySelectorAll(s);
+
+        const daysGrid = $('#daysGrid');
+        const monthLabel = $('#monthLabel');
+        const totalAmount = $('#totalAmount');
+        const electricTotal = $('#electricTotal');
+        const gasTotal = $('#gasTotal');
+        const recordCount = $('#recordCount');
+        const bottomSheet = $('#bottomSheet');
+        const overlay = $('#overlay');
+        const sheetDate = $('#sheetDate');
+        const recordList = $('#recordList');
+        const inputAmount = $('#inputAmount');
+        const inputNote = $('#inputNote');
+        const submitBtn = $('#submitRecord');
+        const typeToggle = $('#typeToggle');
+        const toast = $('#toast');
+        const chartCanvas = $('#trendChart');
+        const chartEmpty = $('#chartEmpty');
+        const chartTitle = $('#chartTitle');
+
+        const summaryMonthly = $('#summaryMonthly');
+        const summaryAnnual = $('#summaryAnnual');
+        const annualTotalAmount = $('#annualTotalAmount');
+        const annualElectricTotal = $('#annualElectricTotal');
+        const annualGasTotal = $('#annualGasTotal');
+        const yearLabel = $('#yearLabel');
+        const annualMonthList = $('#annualMonthList');
+        const yearlyGridContainer = $('#yearlyGridContainer');
+        const monthlyView = $('#monthlyView');
+        const annualView = $('#annualView');
+        const viewTabs = $('#viewTabs');
+
+        const exportBtn = $('#exportExcelBtn');
+        const importBtn = $('#importExcelBtn');
+        const fileInput = $('#fileInput');
+
+        // ================================================================
+        //  工具函数
+        // ================================================================
+        function formatDate(y, m, d) {
+            return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        }
+
+        function parseDate(str) {
+            const parts = str.split('-').map(Number);
+            return { year: parts[0], month: parts[1] - 1, day: parts[2] };
+        }
+
+        function getTodayStr() {
+            const d = new Date();
+            return formatDate(d.getFullYear(), d.getMonth(), d.getDate());
+        }
+
+        function getDaysInMonth(y, m) {
+            return new Date(y, m + 1, 0).getDate();
+        }
+
+        function getFirstDayOfMonth(y, m) {
+            return new Date(y, m, 1).getDay();
+        }
+
+        function formatAmount(n) {
+            return '¥' + n.toFixed(2);
+        }
+
+        function showToast(msg, duration = 1800) {
+            toast.textContent = msg;
+            toast.classList.add('show');
+            clearTimeout(toast._timer);
+            toast._timer = setTimeout(() => toast.classList.remove('show'), duration);
+        }
+
+        // ================================================================
+        //  核心业务
+        // ================================================================
+        function getRecordsForDate(dateStr) {
+            return records.filter(r => r.date === dateStr);
+        }
+
+        function getRecordsForMonth(year, month) {
+            const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+            return records.filter(r => r.date.startsWith(prefix));
+        }
+
+        function getRecordsForYear(year) {
+            const prefix = `${year}-`;
+            return records.filter(r => r.date.startsWith(prefix));
+        }
+
+        function calcMonthSummary(year, month) {
+            const monthRecords = getRecordsForMonth(year, month);
+            let total = 0,
+                electric = 0,
+                gas = 0;
+            monthRecords.forEach(r => {
+                const amt = r.amount || 0;
+                total += amt;
+                if (r.type === 'electric') electric += amt;
+                else if (r.type === 'gas') gas += amt;
+            });
+            return { total, electric, gas, count: monthRecords.length };
+        }
+
+        function calcYearSummary(year) {
+            const yearRecords = getRecordsForYear(year);
+            let total = 0,
+                electric = 0,
+                gas = 0;
+            yearRecords.forEach(r => {
+                const amt = r.amount || 0;
+                total += amt;
+                if (r.type === 'electric') electric += amt;
+                else if (r.type === 'gas') gas += amt;
+            });
+            return { total, electric, gas, count: yearRecords.length };
+        }
+
+        function getAllYears() {
+            const years = new Set();
+            records.forEach(r => {
+                if (r.date) {
+                    const y = parseInt(r.date.split('-')[0]);
+                    if (!isNaN(y)) years.add(y);
+                }
+            });
+            return Array.from(years).sort((a, b) => a - b);
+        }
+
+        function calcYearlySummaryForAllYears() {
+            const years = getAllYears();
+            return years.map(y => ({ year: y, ...calcYearSummary(y) }));
+        }
+
+        function addRecord(date, type, amount, note, usePoints) {
+            if (!date || !type || amount == null || amount <= 0) {
+                showToast('请填写有效的金额');
+                return false;
+            }
+            const record = {
+                id: generateId(),
+                date: date,
+                type: type,
+                amount: Math.round(amount * 100) / 100,
+                note: note ? note.trim() : '',
+                createTime: Date.now(),
+                usePoints: !!usePoints
+            };
+            records.push(record);
+            saveRecords(records);
+            return true;
+        }
+
+        function deleteRecord(id) {
+            records = records.filter(r => r.id !== id);
+            saveRecords(records);
+        }
+
+        function clearAllData() {
+            if (records.length === 0) return;
+            if (confirm('确定要清除所有数据吗？此操作不可撤销！')) {
+                records = [];
+                saveRecords(records);
+                renderAll();
+                showToast('已清除所有数据');
+            }
+        }
+
+        // ================================================================
+        //  Excel 导入导出
+        // ================================================================
+        function exportExcel() {
+            if (records.length === 0) {
+                showToast('没有数据可导出');
+                return;
+            }
+            const data = records.map(r => ({
+                '日期': r.date,
+                '类型': r.type === 'electric' ? '充电' : '加油',
+                '金额': r.amount,
+                '积分支付': r.usePoints ? '是' : '否',
+                '备注': r.note || '',
+                '创建时间': new Date(r.createTime).toLocaleString()
+            }));
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(data);
+            ws['!cols'] = [
+                { wch: 14 },
+                { wch: 10 },
+                { wch: 12 },
+                { wch: 10 },
+                { wch: 20 },
+                { wch: 20 }
+            ];
+            XLSX.utils.book_append_sheet(wb, ws, '能耗记录');
+            const fileName = `能耗记录_${new Date().toISOString().slice(0,10)}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+            showToast(`✅ 成功导出 ${records.length} 条记录`);
+        }
+
+        function importExcel(file) {
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = await XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const json = XLSX.utils.sheet_to_json(firstSheet);
+
+                    if (!json || json.length === 0) {
+                        showToast('文件为空或格式不正确');
+                        return;
+                    }
+
+                    let imported = 0;
+                    let skipped = 0;
+                    json.forEach(row => {
+                        let date = row['日期'] || row['date'] || row['Date'];
+                        let type = row['类型'] || row['type'] || row['Type'];
+                        let amount = row['金额'] || row['amount'] || row['Amount'];
+                        let usePoints = row['积分支付'];
+                        let note = row['备注'] || row['note'] || row['Note'] || '';
+
+                        if (!date || !type || amount == null) {
+                            skipped++;
+                            return;
+                        }
+
+                        let dateStr = '';
+                        if (typeof date === 'number') {
+                            const d = new Date((date - 25569) * 86400 * 1000);
+                            dateStr = formatDate(d.getFullYear(), d.getMonth(), d.getDate());
+                        } else {
+                            const d = new Date(date);
+                            if (!isNaN(d.getTime())) {
+                                dateStr = formatDate(d.getFullYear(), d.getMonth(), d.getDate());
+                            } else {
+                                const parts = String(date).trim().split(/[-/]/);
+                                if (parts.length === 3) {
+                                    const y = parseInt(parts[0]);
+                                    const m = parseInt(parts[1]) - 1;
+                                    const day = parseInt(parts[2]);
+                                    if (!isNaN(y) && !isNaN(m) && !isNaN(day)) {
+                                        dateStr = formatDate(y, m, day);
+                                    }
+                                }
+                            }
+                        }
+
+                        if (!dateStr) {
+                            skipped++;
+                            return;
+                        }
+
+                        let typeKey = '';
+                        const t = String(type).trim().toLowerCase();
+                        if (t === '充电' || t === 'electric' || t === '电') typeKey = 'electric';
+                        else if (t === '加油' || t === 'gas' || t === '油') typeKey = 'gas';
+                        else {
+                            skipped++;
+                            return;
+                        }
+
+                        let amt = parseFloat(amount);
+                        if (isNaN(amt) || amt <= 0) {
+                            skipped++;
+                            return;
+                        }
+
+                        let points = false;
+                        if (usePoints !== undefined && usePoints !== null) {
+                            if (typeof usePoints === 'boolean') {
+                                points = usePoints;
+                            } else if (typeof usePoints === 'string') {
+                                const v = usePoints.trim().toLowerCase();
+                                points = (v === '是' || v === 'yes' || v === 'true' || v === '1');
+                            } else if (typeof usePoints === 'number') {
+                                points = usePoints === 1;
+                            }
+                        }
+
+                        const exists = records.some(r =>
+                            r.date === dateStr &&
+                            r.type === typeKey &&
+                            r.amount === Math.round(amt * 100) / 100 &&
+                            (r.note || '') === (note ? String(note).trim() : '') &&
+                            r.usePoints === points
+                        );
+                        if (exists) {
+                            skipped++;
+                            return;
+                        }
+
+                        const record = {
+                            id: generateId(),
+                            date: dateStr,
+                            type: typeKey,
+                            amount: Math.round(amt * 100) / 100,
+                            note: note ? String(note).trim() : '',
+                            createTime: Date.now() + imported,
+                            usePoints: points
+                        };
+                        records.push(record);
+                        imported++;
+                    });
+
+                    if (imported > 0) {
+                        saveRecords(records);
+                        renderAll();
+                        showToast(`✅ 成功导入 ${imported} 条记录${skipped > 0 ? `，跳过 ${skipped} 条` : ''}`);
+                    } else {
+                        showToast(`⚠️ 未导入任何记录${skipped > 0 ? `，${skipped} 条格式不匹配` : ''}`);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    showToast('❌ 导入失败，请检查文件格式');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // ================================================================
+        //  月度视图渲染
+        // ================================================================
+        function renderMonthlySummary() {
+            const { total, electric, gas, count } = calcMonthSummary(currentYear, currentMonth);
+            totalAmount.textContent = formatAmount(total);
+            electricTotal.textContent = formatAmount(electric);
+            gasTotal.textContent = formatAmount(gas);
+            recordCount.textContent = `共 ${count} 条记录`;
+        }
+
+        function renderMonthlyCalendar() {
+            const y = currentYear,
+                m = currentMonth;
+            const daysInMonth = getDaysInMonth(y, m);
+            const firstDay = getFirstDayOfMonth(y, m);
+            const todayStr = getTodayStr();
+
+            monthLabel.innerHTML = `${y}年<span class="year">${m + 1}月</span>`;
+
+            let html = '';
+            const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
+            const monthRecords = getRecordsForMonth(y, m);
+            const dailyTotal = {};
+            const dailyDetail = {};
+            const dailyPointsElectric = {}; // 记录当天是否有积分支付的电费
+            monthRecords.forEach(r => {
+                if (!dailyDetail[r.date]) dailyDetail[r.date] = { electric: 0, gas: 0 };
+                if (r.type === 'electric') {
+                    dailyDetail[r.date].electric += r.amount || 0;
+                    if (r.usePoints) {
+                        dailyPointsElectric[r.date] = true;
+                    }
+                } else if (r.type === 'gas') {
+                    dailyDetail[r.date].gas += r.amount || 0;
+                }
+                dailyTotal[r.date] = (dailyTotal[r.date] || 0) + (r.amount || 0);
+            });
+
+            for (let i = 0; i < totalCells; i++) {
+                let day = i - firstDay + 1;
+                let isOther = false;
+                let dateStr = '';
+                let dayNum = day;
+
+                if (day < 1) {
+                    const prevMonth = m === 0 ? 11 : m - 1;
+                    const prevYear = m === 0 ? y - 1 : y;
+                    const prevDays = getDaysInMonth(prevYear, prevMonth);
+                    dayNum = prevDays + day;
+                    dateStr = formatDate(prevYear, prevMonth, dayNum);
+                    isOther = true;
+                } else if (day > daysInMonth) {
+                    const nextMonth = m === 11 ? 0 : m + 1;
+                    const nextYear = m === 11 ? y + 1 : y;
+                    dayNum = day - daysInMonth;
+                    dateStr = formatDate(nextYear, nextMonth, dayNum);
+                    isOther = true;
+                } else {
+                    dateStr = formatDate(y, m, day);
+                }
+
+                const isTodayFlag = dateStr === todayStr;
+                const hasRecord = !!dailyTotal[dateStr];
+                const totalAmt = dailyTotal[dateStr] || 0;
+                const hasE = hasRecord && dailyDetail[dateStr].electric > 0;
+                const hasG = hasRecord && dailyDetail[dateStr].gas > 0;
+
+                let classes = 'day-cell';
+                if (isOther) classes += ' empty other-month';
+                if (isTodayFlag) classes += ' today';
+                if (hasRecord) {
+                    classes += ' has-record';
+                    if (hasE && hasG) classes += ' both';
+                    else if (hasE) classes += ' electric';
+                    else if (hasG) classes += ' gas';
+                }
+
+                let dots = '';
+                if (hasRecord) {
+                    if (hasE) {
+                        // 判断是否有积分支付的电费
+                        const hasPoints = dailyPointsElectric[dateStr] || false;
+                        const cls = hasPoints ? 'dot-indicator points' : 'dot-indicator e';
+                        dots += `<span class="${cls}"></span>`;
+                    }
+                    if (hasG) dots += '<span class="dot-indicator g"></span>';
+                }
+
+                let amountText = '';
+                if (hasRecord) {
+                    amountText = formatAmount(totalAmt);
+                }
+
+                html += `<div class="${classes}" data-date="${dateStr}">
+                            <span class="day-number">${dayNum}</span>
+                            <div class="day-dots">${dots}</div>
+                            ${amountText ? `<span class="day-amount">${amountText}</span>` : ''}
+                         </div>`;
+            }
+
+            daysGrid.innerHTML = html;
+
+            daysGrid.querySelectorAll('.day-cell:not(.empty)').forEach(el => {
+                el.addEventListener('click', () => {
+                    const date = el.dataset.date;
+                    if (date) openSheet(date);
+                });
+            });
+        }
+
+        // ================================================================
+        //  年度视图渲染
+        // ================================================================
+        function renderAnnualSummary() {
+            const { total, electric, gas } = calcYearSummary(annualYear);
+            annualTotalAmount.textContent = formatAmount(total);
+            annualElectricTotal.textContent = formatAmount(electric);
+            annualGasTotal.textContent = formatAmount(gas);
+            yearLabel.textContent = `${annualYear}年`;
+        }
+
+        function renderAnnualMonthList() {
+            const year = annualYear;
+            let html = '';
+            let maxTotal = 0;
+            const monthData = [];
+
+            for (let m = 0; m < 12; m++) {
+                const { total, electric, gas } = calcMonthSummary(year, m);
+                monthData.push({ month: m, total, electric, gas });
+                if (total > maxTotal) maxTotal = total;
+            }
+
+            const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+
+            monthData.forEach((data, idx) => {
+                const { total, electric, gas } = data;
+                const hasData = total > 0;
+                const pctE = maxTotal > 0 ? (electric / maxTotal) * 100 : 0;
+                const pctG = maxTotal > 0 ? (gas / maxTotal) * 100 : 0;
+                const pctTotal = maxTotal > 0 ? (total / maxTotal) * 100 : 0;
+
+                const eWidth = hasData ? Math.max(pctE, 0) : 0;
+                const gWidth = hasData ? Math.max(pctG, 0) : 0;
+
+                const displayTotal = hasData ? formatAmount(total) : '—';
+
+                html += `
+                            <div class="month-row" data-month="${idx}">
+                                <span class="month-name">${monthNames[idx]}</span>
+                                <div class="month-bars">
+                                    <div class="bar-track">
+                                        <div class="bar-e" style="width:${eWidth}%;"></div>
+                                        <div class="bar-g" style="width:${gWidth}%;"></div>
+                                    </div>
+                                </div>
+                                <span class="month-total">${displayTotal}</span>
+                            </div>
+                        `;
+            });
+
+            annualMonthList.innerHTML = html;
+
+            annualMonthList.querySelectorAll('.month-row').forEach(el => {
+                el.addEventListener('click', () => {
+                    const monthIdx = parseInt(el.dataset.month);
+                    if (!isNaN(monthIdx)) {
+                        currentYear = annualYear;
+                        currentMonth = monthIdx;
+                        switchView('monthly');
+                        showToast(`切换到 ${currentYear}年${monthIdx+1}月`);
+                    }
+                });
+            });
+        }
+
+        function renderYearlySummary() {
+            const yearlyData = calcYearlySummaryForAllYears();
+            const container = yearlyGridContainer;
+
+            if (yearlyData.length === 0) {
+                container.innerHTML = `<div class="empty-yearly">📭 暂无年度数据</div>`;
+                return;
+            }
+
+            let html = '<div class="yearly-grid">';
+            yearlyData.forEach(item => {
+                const isCurrent = item.year === annualYear;
+                html += `
+                            <div class="yearly-item${isCurrent ? ' current' : ''}" style="${isCurrent ? 'background:#e8f0fe;' : ''}">
+                                <div class="y-year">${item.year}年</div>
+                                <div class="y-amount">${formatAmount(item.total)}</div>
+                                <div class="y-detail">
+                                    <div class="e">⚡ ${formatAmount(item.electric)}</div>
+                                    <div class="g">⛽ ${formatAmount(item.gas)}</div>
+                                </div>
+                            </div>
+                        `;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+
+            container.querySelectorAll('.yearly-item').forEach(el => {
+                el.addEventListener('click', () => {
+                    const yearText = el.querySelector('.y-year')?.textContent || '';
+                    const year = parseInt(yearText);
+                    if (!isNaN(year) && year > 0) {
+                        annualYear = year;
+                        renderAnnualView();
+                        showToast(`切换到 ${year}年`);
+                    }
+                });
+            });
+        }
+
+        function renderAnnualView() {
+            renderAnnualSummary();
+            renderAnnualMonthList();
+            renderYearlySummary();
+            renderAnnualChart();
+        }
+
+        // ================================================================
+        //  图表
+        // ================================================================
+        function renderMonthlyChart() {
+            const y = currentYear,
+                m = currentMonth;
+            const daysInMonth = getDaysInMonth(y, m);
+            const monthRecords = getRecordsForMonth(y, m);
+
+            const dailyMap = {};
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateStr = formatDate(y, m, d);
+                dailyMap[dateStr] = { electric: 0, gas: 0 };
+            }
+            monthRecords.forEach(r => {
+                if (dailyMap[r.date]) {
+                    if (r.type === 'electric') dailyMap[r.date].electric += r.amount || 0;
+                    else if (r.type === 'gas') dailyMap[r.date].gas += r.amount || 0;
+                }
+            });
+
+            const labels = [];
+            const electricData = [];
+            const gasData = [];
+            let hasData = false;
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateStr = formatDate(y, m, d);
+                labels.push(d);
+                const e = dailyMap[dateStr].electric;
+                const g = dailyMap[dateStr].gas;
+                electricData.push(e);
+                gasData.push(g);
+                if (e > 0 || g > 0) hasData = true;
+            }
+
+            chartTitle.innerHTML = `<span>📈 每日花费趋势</span><span class="year-badge">${y}年${m+1}月</span>`;
+
+            renderChartData(
+                labels,
+                electricData,
+                gasData,
+                hasData,
+                'line'
+            );
+        }
+
+        function renderAnnualChart() {
+            const year = annualYear;
+            const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+            const electricData = [];
+            const gasData = [];
+            let hasData = false;
+
+            for (let m = 0; m < 12; m++) {
+                const { electric, gas } = calcMonthSummary(year, m);
+                electricData.push(electric);
+                gasData.push(gas);
+                if (electric > 0 || gas > 0) hasData = true;
+            }
+
+            chartTitle.innerHTML = `<span>📊 每月花费分布</span><span class="year-badge">${year}年</span>`;
+
+            renderChartData(
+                monthNames,
+                electricData,
+                gasData,
+                hasData,
+                'bar'
+            );
+        }
+
+        function renderChartData(labels, electricData, gasData, hasData, chartType) {
+            const ctx = chartCanvas.getContext('2d');
+
+            if (chartInstance) {
+                chartInstance.destroy();
+                chartInstance = null;
+            }
+
+            if (!hasData) {
+                chartCanvas.style.display = 'none';
+                chartEmpty.style.display = 'block';
+                return;
+            }
+
+            chartCanvas.style.display = 'block';
+            chartEmpty.style.display = 'none';
+
+            const isBar = chartType === 'bar';
+
+            chartInstance = new Chart(ctx, {
+                type: chartType,
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '充电 (¥)',
+                        data: electricData,
+                        borderColor: '#3b82f6',
+                        backgroundColor: isBar ? 'rgba(59, 130, 246, 0.7)' : 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.2,
+                        pointRadius: isBar ? 0 : 2,
+                        pointBackgroundColor: '#3b82f6',
+                        fill: !isBar,
+                        borderWidth: isBar ? 1 : 2,
+                        borderRadius: isBar ? 2 : 0,
+                    }, {
+                        label: '加油 (¥)',
+                        data: gasData,
+                        borderColor: '#f59e0b',
+                        backgroundColor: isBar ? 'rgba(245, 158, 11, 0.7)' : 'rgba(245, 158, 11, 0.1)',
+                        tension: 0.2,
+                        pointRadius: isBar ? 0 : 2,
+                        pointBackgroundColor: '#f59e0b',
+                        fill: !isBar,
+                        borderWidth: isBar ? 1 : 2,
+                        borderRadius: isBar ? 2 : 0,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                boxWidth: 12,
+                                padding: 8,
+                                font: { size: 11 }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ' ' + context.parsed.y.toFixed(2);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: {
+                                maxTicksLimit: isBar ? 12 : 15,
+                                font: { size: isBar ? 10 : 9 },
+                                maxRotation: isBar ? 30 : 0,
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(0,0,0,0.05)' },
+                            ticks: {
+                                callback: function(value) { return '¥' + value.toFixed(0); },
+                                font: { size: 10 }
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
+        }
+
+        // ================================================================
+        //  底部弹出层
+        // ================================================================
+        let sheetOpen = false;
+
+        function renderSheet(dateStr) {
+            const { year, month, day } = parseDate(dateStr);
+            sheetDate.textContent = `${year}年${month + 1}月${day}日`;
+
+            const dayRecords = getRecordsForDate(dateStr);
+
+            if (dayRecords.length === 0) {
+                recordList.innerHTML = `<div class="empty-msg">📭 当天暂无记录</div>`;
+            } else {
+                const sorted = [...dayRecords].sort((a, b) => b.createTime - a.createTime);
+                let html = '';
+                sorted.forEach(r => {
+                    const typeLabel = r.type === 'electric' ? '⚡ 充电' : '⛽ 加油';
+                    const typeCls = r.type === 'electric' ? 'e' : 'g';
+                    const amountCls = r.type === 'electric' ? 'e' : 'g';
+                    const note = r.note ? `<span class="note">${r.note}</span>` : '';
+                    const pointsMark = r.usePoints ? `<span class="points-mark">🎫积分</span>` : '';
+                    html += `
+                                <div class="record-item" data-id="${r.id}">
+                                    <div class="left">
+                                        <span class="type-badge ${typeCls}">${typeLabel}</span>
+                                        <span class="info-text">${note}</span>
+                                    </div>
+                                    <div class="right">
+                                        <span class="amount ${amountCls}">${formatAmount(r.amount)}</span>
+                                        ${pointsMark}
+                                        <button class="del-btn" data-id="${r.id}">✕</button>
+                                    </div>
+                                </div>
+                            `;
+                });
+                recordList.innerHTML = html;
+
+                recordList.querySelectorAll('.del-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const id = btn.dataset.id;
+                        if (confirm('确定删除这条记录吗？')) {
+                            deleteRecord(id);
+                            renderAll();
+                            const remaining = getRecordsForDate(dateStr);
+                            if (remaining.length === 0) {
+                                renderSheet(dateStr);
+                            } else {
+                                renderSheet(dateStr);
+                            }
+                            showToast('已删除');
+                        }
+                    });
+                });
+            }
+
+            inputAmount.value = '';
+            inputNote.value = '';
+            document.getElementById('usePoints').checked = false;
+            inputAmount.focus();
+            updateTypeToggle(currentType);
+            updateSubmitBtn();
+            inputAmount.dataset.date = dateStr;
+        }
+
+        function updateTypeToggle(type) {
+            currentType = type;
+            const btns = typeToggle.querySelectorAll('button');
+            btns.forEach(btn => {
+                btn.className = '';
+                if (btn.dataset.type === type) {
+                    btn.classList.add(type === 'electric' ? 'active-e' : 'active-g');
+                }
+            });
+            // 控制积分复选框：加油时禁用
+            const pointsCheckbox = document.getElementById('usePoints');
+            const pointsLabel = document.getElementById('pointsLabel');
+            if (type === 'electric') {
+                pointsCheckbox.disabled = false;
+                pointsLabel.classList.remove('is-disabled');
+            } else {
+                pointsCheckbox.disabled = true;
+                pointsCheckbox.checked = false;
+                pointsLabel.classList.add('is-disabled');
+            }
+            updateSubmitBtn();
+        }
+
+        function updateSubmitBtn() {
+            if (currentType === 'electric') {
+                submitBtn.className = 'submit-btn';
+                submitBtn.textContent = '⚡ 添加';
+            } else {
+                submitBtn.className = 'submit-btn gas-mode';
+                submitBtn.textContent = '⛽ 添加';
+            }
+        }
+
+        function openSheet(dateStr) {
+            selectedDate = dateStr;
+            renderSheet(dateStr);
+            bottomSheet.classList.add('active');
+            overlay.classList.add('active');
+            sheetOpen = true;
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeSheet() {
+            bottomSheet.classList.remove('active');
+            overlay.classList.remove('active');
+            sheetOpen = false;
+            document.body.style.overflow = '';
+        }
+
+        // ================================================================
+        //  视图切换
+        // ================================================================
+        function switchView(mode) {
+            viewMode = mode;
+            viewTabs.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.view === mode);
+            });
+
+            summaryMonthly.style.display = mode === 'monthly' ? 'block' : 'none';
+            summaryAnnual.style.display = mode === 'annual' ? 'block' : 'none';
+
+            monthlyView.classList.toggle('hidden', mode !== 'monthly');
+            annualView.classList.toggle('hidden', mode !== 'annual');
+
+            if (mode === 'monthly') {
+                renderMonthlyView();
+            } else {
+                renderAnnualView();
+            }
+        }
+
+        function renderMonthlyView() {
+            renderMonthlySummary();
+            renderMonthlyCalendar();
+            renderMonthlyChart();
+        }
+
+        function renderAll() {
+            if (viewMode === 'monthly') {
+                renderMonthlyView();
+            } else {
+                renderAnnualView();
+            }
+            if (sheetOpen && selectedDate) {
+                renderSheet(selectedDate);
+            }
+        }
+
+        // ================================================================
+        //  导航
+        // ================================================================
+        function goToPrevMonth() {
+            if (currentMonth === 0) { currentMonth = 11;
+                currentYear--; } else { currentMonth--; }
+            renderAll();
+        }
+
+        function goToNextMonth() {
+            if (currentMonth === 11) { currentMonth = 0;
+                currentYear++; } else { currentMonth++; }
+            renderAll();
+        }
+
+        function goToToday() {
+            const d = new Date();
+            currentYear = d.getFullYear();
+            currentMonth = d.getMonth();
+            renderAll();
+        }
+
+        function goToPrevYear() {
+            annualYear--;
+            renderAll();
+        }
+
+        function goToNextYear() {
+            annualYear++;
+            renderAll();
+        }
+
+        function goToThisYear() {
+            annualYear = new Date().getFullYear();
+            renderAll();
+        }
+
+        // ================================================================
+        //  添加记录
+        // ================================================================
+        function handleAddRecord() {
+            const date = inputAmount.dataset.date;
+            if (!date) {
+                showToast('请选择日期');
+                return;
+            }
+            const amount = parseFloat(inputAmount.value);
+            if (!amount || amount <= 0) {
+                showToast('请输入有效的金额');
+                inputAmount.focus();
+                return;
+            }
+            const note = inputNote.value.trim();
+            const usePoints = document.getElementById('usePoints').checked;
+
+            if (addRecord(date, currentType, amount, note, usePoints)) {
+                showToast(`✅ 已记录 ${currentType === 'electric' ? '充电' : '加油'} ${formatAmount(amount)}${usePoints ? ' 🎫积分' : ''}`);
+                renderAll();
+                if (sheetOpen && selectedDate === date) {
+                    renderSheet(date);
+                }
+                inputAmount.value = '';
+                inputNote.value = '';
+                document.getElementById('usePoints').checked = false;
+                inputAmount.focus();
+            }
+        }
+
+        // ================================================================
+        //  事件绑定
+        // ================================================================
+        function initEvents() {
+            viewTabs.addEventListener('click', (e) => {
+                const btn = e.target.closest('.tab-btn');
+                if (!btn) return;
+                const mode = btn.dataset.view;
+                if (mode && mode !== viewMode) {
+                    switchView(mode);
+                }
+            });
+
+            $('#prevMonth').addEventListener('click', goToPrevMonth);
+            $('#nextMonth').addEventListener('click', goToNextMonth);
+            $('#todayBtn').addEventListener('click', goToToday);
+
+            $('#prevYearBtn').addEventListener('click', goToPrevYear);
+            $('#nextYearBtn').addEventListener('click', goToNextYear);
+            $('#thisYearBtn').addEventListener('click', goToThisYear);
+
+            $('#fabAdd').addEventListener('click', () => {
+                const today = getTodayStr();
+                const d = new Date();
+                if (viewMode === 'annual') {
+                    switchView('monthly');
+                    currentYear = d.getFullYear();
+                    currentMonth = d.getMonth();
+                    renderAll();
+                } else {
+                    if (currentYear !== d.getFullYear() || currentMonth !== d.getMonth()) {
+                        currentYear = d.getFullYear();
+                        currentMonth = d.getMonth();
+                        renderAll();
+                    }
+                }
+                openSheet(today);
+            });
+
+            overlay.addEventListener('click', closeSheet);
+            $('#sheetClose').addEventListener('click', closeSheet);
+
+            typeToggle.addEventListener('click', (e) => {
+                const btn = e.target.closest('button');
+                if (!btn) return;
+                const type = btn.dataset.type;
+                if (type) {
+                    updateTypeToggle(type);
+                }
+            });
+
+            submitBtn.addEventListener('click', handleAddRecord);
+
+            inputAmount.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (inputAmount.value.trim()) {
+                        handleAddRecord();
+                    }
+                }
+            });
+            inputNote.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (inputAmount.value.trim()) {
+                        handleAddRecord();
+                    }
+                }
+            });
+
+            $('#clearAllBtn').addEventListener('click', clearAllData);
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && sheetOpen) closeSheet();
+            });
+
+            exportBtn.addEventListener('click', exportExcel);
+
+            importBtn.addEventListener('click', () => {
+                fileInput.click();
+            });
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    importExcel(file);
+                }
+                fileInput.value = '';
+            });
+        }
+
+        // ================================================================
+        //  初始化
+        // ================================================================
+        function init() {
+            const d = new Date();
+            currentYear = d.getFullYear();
+            currentMonth = d.getMonth();
+            annualYear = d.getFullYear();
+            updateTypeToggle('electric');
+            switchView('monthly');
+            initEvents();
+            if (records.length === 0) {
+                setTimeout(() => showToast('👋 点击右下角 + 开始记录', 2000), 300);
+            }
+        }
+
+        // 启动逻辑交由 auth-sync.js：先判断登录状态，再初始化界面
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof window.__boot === 'function') window.__boot();
+            else init();
+        });
+    </script>
+    <script src="./supabase-sync.js"></script>
+
+    <!-- ===== 首次使用：连接 Supabase ===== -->
+    <div class="login-screen hidden" id="setupScreen">
+        <div class="login-card">
+            <div class="login-logo">☁️</div>
+            <div class="login-title">连接你的数据库</div>
+            <div class="login-sub">第一次使用要填两个值<br />都来自你自己的 Supabase 项目</div>
+
+            <div class="field">
+                <label for="setupUrl">项目地址 Project URL</label>
+                <input id="setupUrl" type="url" placeholder="https://xxxxxxxx.supabase.co" autocapitalize="none" spellcheck="false" />
+            </div>
+            <div class="field">
+                <label for="setupKey">匿名 Key anon public</label>
+                <input id="setupKey" type="text" placeholder="eyJhbGciOiJIUzI1NiIs..." autocapitalize="none" spellcheck="false" />
+            </div>
+
+            <div class="login-error" id="setupError"></div>
+            <button class="login-submit" id="setupSave">连接并保存</button>
+
+            <div class="login-foot">
+                不知道填什么？<a href="#" id="setupHelp" style="color:#3b82f6;text-decoration:none;">点这里看在哪找</a><br />
+                这两个值只存在本机浏览器里，换设备需要再填一次
+            </div>
+        </div>
+    </div>
+</body>
+</html>

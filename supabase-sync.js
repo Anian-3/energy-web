@@ -1,0 +1,638 @@
+/* ================================================================
+   小紫油电记录 · Supabase 免服务器版
+   数据直接存到你自己的 Supabase 项目（免费、不要信用卡），
+   网页挂在 GitHub Pages 上，没有任何自己的后端要维护。
+
+   依赖主脚本暴露的：DB / currentUser / records / loadRecords
+                    / renderAll / init / showToast
+   ================================================================ */
+(function () {
+    'use strict';
+
+    const URL_KEY = 'sb_url';
+    const KEY_KEY = 'sb_key';
+    const SESSION_KEY = 'sb_session';
+
+    const CFG = { url: '', key: '' };
+    const SESSION = { access: '', refresh: '', expiresAt: 0, user: null };
+
+    let syncing = false;
+    let syncTimer = 0;
+    let booted = false;
+    let loginMode = 'login';
+    let lastSyncAt = 0;
+    let lastVisibleSync = 0;
+    let status = { kind: 'offline', text: '未连接' };
+
+    const byId = (id) => document.getElementById(id);
+    const toast = (msg, ms) => { if (typeof showToast === 'function') showToast(msg, ms || 1800); };
+
+    // ───────────────────────── 配置 ─────────────────────────
+    function loadCfg() {
+        CFG.url = (localStorage.getItem(URL_KEY) || '').trim().replace(/\/+$/, '');
+        CFG.key = (localStorage.getItem(KEY_KEY) || '').trim();
+    }
+
+    function saveCfg(url, key) {
+        CFG.url = String(url || '').trim().replace(/\/+$/, '');
+        CFG.key = String(key || '').trim();
+        localStorage.setItem(URL_KEY, CFG.url);
+        localStorage.setItem(KEY_KEY, CFG.key);
+    }
+
+    const hasCfg = () => !!(CFG.url && CFG.key);
+
+    // ───────────────────────── 请求 ─────────────────────────
+    async function rawFetch(path, opts) {
+        const res = await fetch(CFG.url + path, opts);
+        const text = await res.text();
+        let data = null;
+        try { data = text ? JSON.parse(text) : null; } catch (e) { data = text; }
+        return { res, data };
+    }
+
+    /** 调用 GoTrue / PostgREST；自动处理 401 刷新令牌 */
+    async function sb(path, { method = 'GET', body, prefer, auth = true, base = '' } = {}) {
+        const headers = {
+            apikey: CFG.key,
+            'Content-Type': 'application/json',
+        };
+        if (base) headers.Authorization = 'Bearer ' + base;
+        else if (auth && SESSION.access) headers.Authorization = 'Bearer ' + SESSION.access;
+        if (prefer) headers.Prefer = prefer;
+
+        let { res, data } = await rawFetch(path, {
+            method,
+            headers,
+            body: body === undefined ? undefined : JSON.stringify(body),
+        });
+
+        if (res.status === 401 && auth && SESSION.refresh && !base) {
+            const ok = await refreshToken();
+            if (ok) {
+                headers.Authorization = 'Bearer ' + SESSION.access;
+                ({ res, data } = await rawFetch(path, {
+                    method,
+                    headers,
+                    body: body === undefined ? undefined : JSON.stringify(body),
+                }));
+            }
+        }
+
+        if (!res.ok) {
+            const msg = (data && (data.msg || data.message || data.error_description || data.error || data.hint)) ||
+                ('请求失败（HTTP ' + res.status + '）');
+            const err = new Error(String(msg));
+            err.status = res.status;
+            err.data = data;
+            throw err;
+        }
+        return data;
+    }
+
+    // ───────────────────────── 会话 ─────────────────────────
+    function applySession(data) {
+        SESSION.access = data.access_token || '';
+        SESSION.refresh = data.refresh_token || SESSION.refresh;
+        SESSION.expiresAt = Date.now() + (Number(data.expires_in || 3600) * 1000);
+        if (data.user) {
+            SESSION.user = {
+                id: data.user.id,
+                username: usernameFromEmail(data.user.email || ''),
+            };
+        }
+        localStorage.setItem(SESSION_KEY, JSON.stringify({
+            access: SESSION.access,
+            refresh: SESSION.refresh,
+            expiresAt: SESSION.expiresAt,
+            user: SESSION.user,
+        }));
+    }
+
+    function restoreSession() {
+        try {
+            const raw = localStorage.getItem(SESSION_KEY);
+            if (!raw) return;
+            const s = JSON.parse(raw);
+            if (!s || !s.refresh) return;
+            SESSION.access = s.access || '';
+            SESSION.refresh = s.refresh;
+            SESSION.expiresAt = Number(s.expiresAt) || 0;
+            SESSION.user = s.user || null;
+        } catch (e) {
+            /* 忽略损坏的会话 */
+        }
+    }
+
+    function clearSession() {
+        SESSION.access = '';
+        SESSION.refresh = '';
+        SESSION.expiresAt = 0;
+        SESSION.user = null;
+        localStorage.removeItem(SESSION_KEY);
+    }
+
+    async function refreshToken() {
+        if (!SESSION.refresh) return false;
+        try {
+            const data = await sb('/auth/v1/token?grant_type=refresh_token', {
+                method: 'POST',
+                body: { refresh_token: SESSION.refresh },
+                auth: false,
+            });
+            applySession(data);
+            return true;
+        } catch (e) {
+            clearSession();
+            return false;
+        }
+    }
+
+    async function ensureToken() {
+        if (!SESSION.access) return false;
+        if (SESSION.expiresAt - 60000 > Date.now()) return true;
+        return await refreshToken();
+    }
+
+    // 账号映射：含 @ 当真实邮箱用；否则映射成 <名字>@example.com
+    function emailFromUsername(name) {
+        const v = String(name || '').trim().toLowerCase();
+        if (!v) return '';
+        return v.includes('@') ? v : v + '@example.com';
+    }
+
+    function usernameFromEmail(email) {
+        const v = String(email || '');
+        return v.endsWith('@example.com') ? v.slice(0, -'@example.com'.length) : v;
+    }
+
+    // ───────────────────────── 状态显示 ─────────────────────────
+    function setStatus(kind, text) {
+        status = { kind, text };
+        const dot = byId('syncDot');
+        if (dot) dot.className = 'sync-dot ' + kind;
+        const st = byId('acctStatus');
+        if (st) st.textContent = text;
+    }
+
+    function timeAgo(ts) {
+        if (!ts) return '从未';
+        const d = Date.now() - ts;
+        if (d < 60000) return '刚刚';
+        if (d < 3600000) return Math.floor(d / 60000) + ' 分钟前';
+        if (d < 86400000) return Math.floor(d / 3600000) + ' 小时前';
+        return Math.floor(d / 86400000) + ' 天前';
+    }
+
+    function updateCount() {
+        const el = byId('acctCount');
+        if (el) el.textContent = (typeof records !== 'undefined' && records ? records.length : 0) + ' 条';
+    }
+
+    function renderAccountPanel() {
+        if (!SESSION.user) {
+            const name = byId('acctName');
+            if (name) name.textContent = '未登录';
+            return;
+        }
+        const u = SESSION.user;
+        byId('acctName').textContent = u.username;
+        byId('acctAvatar').textContent = String(u.username || 'U').slice(0, 1).toUpperCase();
+        byId('acctMeta').textContent = status.text;
+        byId('acctLast').textContent = timeAgo(lastSyncAt);
+        updateCount();
+    }
+
+    // ───────────────────────── 同步 ─────────────────────────
+    const COLS = 'id,date,type,amount,note,use_points,create_time,client_ts,deleted';
+
+    function toRow(r) {
+        return {
+            id: r.id,
+            date: r.date,
+            type: r.type,
+            amount: r.amount,
+            note: r.note || '',
+            use_points: !!r.usePoints,
+            create_time: r.createTime || 0,
+            client_ts: r.updatedAt || r.createTime || 0,
+            deleted: !!r.deleted,
+        };
+    }
+
+    function fromRow(o) {
+        return {
+            id: o.id,
+            date: o.date,
+            type: o.type,
+            amount: Number(o.amount) || 0,
+            note: o.note || '',
+            usePoints: !!o.use_points,
+            createTime: Number(o.create_time) || 0,
+            updatedAt: Number(o.client_ts) || 0,
+            deleted: o.deleted ? 1 : 0,
+        };
+    }
+
+    function scheduleSync(delay) {
+        if (!SESSION.access) return;
+        clearTimeout(syncTimer);
+        syncTimer = setTimeout(() => { syncNow(); }, delay === undefined ? 1200 : delay);
+    }
+
+    function applyRemote(rows) {
+        if (!rows || !rows.length) return;
+        const all = DB.all();
+        const map = new Map(all.map((r) => [r.id, r]));
+        let changed = false;
+
+        for (const o of rows) {
+            const s = fromRow(o);
+            const local = map.get(s.id);
+            // 本地有未上传且更新的改动 → 保留本地
+            if (local && local.dirty && (local.updatedAt || 0) > (s.updatedAt || 0)) continue;
+
+            const same = local && !local.dirty && local.updatedAt === s.updatedAt &&
+                !!local.deleted === !!s.deleted && local.date === s.date &&
+                local.type === s.type && local.amount === s.amount &&
+                (local.note || '') === s.note && !!local.usePoints === s.usePoints;
+            if (same) continue;
+
+            map.set(s.id, { ...s, dirty: 0 });
+            changed = true;
+        }
+
+        if (!changed) return;
+        DB.saveAll(Array.from(map.values()));
+        records = DB.visible();
+        if (typeof renderAll === 'function') renderAll();
+        updateCount();
+    }
+
+    async function syncNow(opts) {
+        if (!SESSION.access || syncing || !hasCfg()) return;
+        if (!navigator.onLine) {
+            setStatus('offline', '离线，联网后自动同步');
+            return;
+        }
+
+        syncing = true;
+        setStatus('syncing', '同步中…');
+        try {
+            await ensureToken();
+
+            const dirty = DB.all().filter((r) => r.dirty);
+            if (dirty.length) {
+                const rows = dirty.map(toRow);
+                // 分批发，单次别太多
+                for (let i = 0; i < rows.length; i += 200) {
+                    await sb('/rest/v1/records?on_conflict=user_id,id', {
+                        method: 'POST',
+                        body: rows.slice(i, i + 200),
+                        prefer: 'resolution=merge-duplicates,return=minimal',
+                    });
+                }
+                const sent = new Map(dirty.map((r) => [r.id, r.updatedAt]));
+                DB.markClean(sent);
+            }
+
+            const rows = await sb('/rest/v1/records?select=' + encodeURIComponent(COLS) + '&limit=20000');
+            applyRemote(rows || []);
+
+            lastSyncAt = Date.now();
+            localStorage.setItem('sb_last_sync', String(lastSyncAt));
+            setStatus('ok', '已同步');
+            renderAccountPanel();
+        } catch (e) {
+            if (e.status === 401) {
+                setStatus('error', '登录已过期');
+                if (opts && opts.manual) toast('登录已过期，请重新登录');
+            } else if (!navigator.onLine) {
+                setStatus('offline', '离线，联网后自动同步');
+            } else {
+                setStatus('error', '同步失败');
+                if (opts && opts.manual) toast('同步失败：' + (e.message || '网络异常'), 2600);
+                console.warn('[sync]', e);
+            }
+        } finally {
+            syncing = false;
+            renderAccountPanel();
+        }
+    }
+
+    // ───────────────────────── 旧数据迁移 ─────────────────────────
+    function migrateGuestData() {
+        let guest = [];
+        try {
+            const raw = localStorage.getItem('hybrid_energy_records');
+            if (raw) guest = JSON.parse(raw) || [];
+        } catch (e) { return; }
+        if (!Array.isArray(guest) || !guest.length) return;
+
+        const msg = '检测到本机有 ' + guest.length + ' 条旧的本地记录，是否一并上传到当前账号？';
+        if (!confirm(msg)) return;
+
+        const all = DB.all();
+        const now = Date.now();
+        let added = 0;
+        guest.forEach((r, i) => {
+            if (!r || !r.id || !r.date || !r.type) return;
+            if (all.some((x) => x.id === r.id)) return;
+            all.push({
+                id: r.id,
+                date: r.date,
+                type: r.type,
+                amount: Number(r.amount) || 0,
+                note: r.note || '',
+                usePoints: !!r.usePoints,
+                createTime: r.createTime || now,
+                updatedAt: now + i,
+                dirty: 1,
+                deleted: 0,
+            });
+            added++;
+        });
+        if (!added) return;
+
+        DB.saveAll(all);
+        records = DB.visible();
+        if (typeof renderAll === 'function') renderAll();
+        try { localStorage.setItem('hybrid_energy_records_backup', JSON.stringify(guest)); } catch (e) {}
+        localStorage.removeItem('hybrid_energy_records');
+        toast('已导入 ' + added + ' 条旧记录，正在上传…', 2200);
+        scheduleSync(0);
+    }
+
+    // ───────────────────────── 服务器设置 ─────────────────────────
+    function showSetup() {
+        byId('setupScreen').classList.remove('hidden');
+        byId('loginScreen').classList.add('hidden');
+        byId('setupUrl').value = CFG.url || '';
+        byId('setupKey').value = CFG.key || '';
+    }
+
+    function hideSetup() {
+        byId('setupScreen').classList.add('hidden');
+    }
+
+    async function saveSetup() {
+        const url = byId('setupUrl').value.trim().replace(/\/+$/, '');
+        const key = byId('setupKey').value.trim();
+        const errEl = byId('setupError');
+        const btn = byId('setupSave');
+
+        errEl.textContent = '';
+        if (!/^https?:\/\/[^\s/]+$/i.test(url)) {
+            errEl.textContent = '地址应形如 https://xxxxxxxx.supabase.co（只填到 .co，不要带 /rest 之类）';
+            return;
+        }
+        if (key.length < 40) {
+            errEl.textContent = 'Key 看起来不完整（anon public key 是一长串）';
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = '连接中…';
+        try {
+            const res = await fetch(url + '/rest/v1/records?select=id&limit=1', {
+                headers: { apikey: key, Authorization: 'Bearer ' + key },
+            });
+            if (res.status === 401 || res.status === 403) throw new Error('Key 不对或没有权限（要用 anon public key）');
+            if (res.status === 404) throw new Error('连上了，但没找到 records 表——SQL 建表脚本执行了吗？');
+            if (!res.ok && res.status !== 206) throw new Error('连接失败（HTTP ' + res.status + '）');
+
+            saveCfg(url, key);
+            hideSetup();
+            showLogin('login');
+            toast('服务器已连接');
+        } catch (e) {
+            errEl.textContent = /Failed to fetch|NetworkError|load failed/i.test(e.message)
+                ? '连不上，检查地址是否填错、或网络是否被挡'
+                : (e.message || '连接失败');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '连接并保存';
+        }
+    }
+
+    // ───────────────────────── 登录界面 ─────────────────────────
+    function setMode(mode) {
+        loginMode = mode;
+        document.querySelectorAll('#authTabs button').forEach((b) => {
+            b.classList.toggle('active', b.dataset.mode === mode);
+        });
+        byId('authPass2Field').style.display = mode === 'register' ? '' : 'none';
+        byId('authSubmit').textContent = mode === 'register' ? '注 册' : '登 录';
+        byId('authPass').setAttribute('autocomplete', mode === 'register' ? 'new-password' : 'current-password');
+        byId('authError').textContent = '';
+    }
+
+    function showLogin(mode) {
+        byId('loginScreen').classList.remove('hidden');
+        setMode(mode || 'login');
+        setTimeout(() => { const u = byId('authUser'); if (u && !u.value) u.focus(); }, 240);
+    }
+
+    function hideLogin() {
+        byId('loginScreen').classList.add('hidden');
+    }
+
+    function authError(msg) {
+        byId('authError').textContent = msg || '';
+    }
+
+    async function doAuth() {
+        const username = byId('authUser').value.trim();
+        const password = byId('authPass').value;
+        const btn = byId('authSubmit');
+
+        if (!username || !password) { authError('请输入账号和密码'); return; }
+        if (loginMode === 'register') {
+            if (username.length < 3) { authError('账号至少 3 位'); return; }
+            if (password.length < 6) { authError('密码至少 6 位'); return; }
+            if (password !== byId('authPass2').value) { authError('两次输入的密码不一致'); return; }
+        }
+
+        authError('');
+        btn.disabled = true;
+        const original = btn.textContent;
+        btn.textContent = loginMode === 'register' ? '注册中…' : '登录中…';
+
+        try {
+            const email = emailFromUsername(username);
+            let data;
+            if (loginMode === 'register') {
+                data = await sb('/auth/v1/signup', {
+                    method: 'POST',
+                    body: { email, password },
+                    auth: false,
+                });
+                if (!data || !data.access_token) {
+                    authError('注册成功，但项目开启了「邮箱确认」。请到 Supabase 关掉 Confirm email 后重新登录，或改用真实邮箱注册。');
+                    btn.disabled = false;
+                    btn.textContent = original;
+                    return;
+                }
+            } else {
+                data = await sb('/auth/v1/token?grant_type=password', {
+                    method: 'POST',
+                    body: { email, password },
+                    auth: false,
+                });
+            }
+            applySession(data);
+            byId('authPass').value = '';
+            byId('authPass2').value = '';
+            enterApp(SESSION.user);
+            toast((loginMode === 'register' ? '注册成功，' : '欢迎回来，') + SESSION.user.username);
+        } catch (e) {
+            const m = String(e.message || '');
+            if (/already registered|already exists|User already/i.test(m)) authError('这个账号已存在，直接「登录」即可');
+            else if (/Invalid login credentials/i.test(m)) authError('账号或密码不正确');
+            else if (/Password should be at least/i.test(m)) authError('密码太短（Supabase 要求至少 6 位）');
+            else authError(m || '操作失败，请稍后再试');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = original;
+        }
+    }
+
+    // ───────────────────────── 账号面板 ─────────────────────────
+    function openAccount() {
+        renderAccountPanel();
+        byId('acctPanel').classList.add('show');
+        byId('acctMask').classList.add('show');
+    }
+
+    function closeAccount() {
+        byId('acctPanel').classList.remove('show');
+        byId('acctMask').classList.remove('show');
+        byId('acctPwdBox').classList.remove('show');
+        byId('pwdError').textContent = '';
+    }
+
+    async function savePassword() {
+        const newPass = byId('pwdNew').value;
+        const errEl = byId('pwdError');
+        if (!newPass) { errEl.textContent = '请填写新密码'; return; }
+        if (newPass.length < 6) { errEl.textContent = '新密码至少 6 位'; return; }
+        try {
+            await ensureToken();
+            await sb('/auth/v1/user', { method: 'PUT', body: { password: newPass } });
+            byId('pwdOld').value = '';
+            byId('pwdNew').value = '';
+            byId('acctPwdBox').classList.remove('show');
+            errEl.textContent = '';
+            toast('密码已修改');
+        } catch (e) {
+            errEl.textContent = e.message || '修改失败';
+        }
+    }
+
+    async function logout() {
+        if (!confirm('退出登录后本机将看不到云端数据（本地缓存会保留），确定退出？')) return;
+        try {
+            await sb('/auth/v1/logout', { method: 'POST' });
+        } catch (e) { /* 令牌可能已过期，忽略 */ }
+        clearSession();
+        location.reload();
+    }
+
+    function wireAccountUI() {
+        byId('acctBtn').addEventListener('click', openAccount);
+        byId('acctMask').addEventListener('click', closeAccount);
+        byId('acctSync').addEventListener('click', () => { toast('正在同步…', 900); syncNow({ manual: true }); });
+        byId('acctPwdBtn').addEventListener('click', () => {
+            byId('acctPwdBox').classList.toggle('show');
+        });
+        byId('pwdSave').addEventListener('click', savePassword);
+        byId('acctLogout').addEventListener('click', logout);
+        byId('acctSetup').addEventListener('click', () => { closeAccount(); showSetup(); });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeAccount();
+        });
+    }
+
+    function wireLoginUI() {
+        byId('authTabs').addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-mode]');
+            if (btn) setMode(btn.dataset.mode);
+        });
+        byId('authSubmit').addEventListener('click', doAuth);
+        ['authUser', 'authPass', 'authPass2'].forEach((id) => {
+            byId(id).addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); doAuth(); }
+            });
+        });
+        byId('setupSave').addEventListener('click', saveSetup);
+        byId('setupHelp').addEventListener('click', (e) => {
+            e.preventDefault();
+            alert('在 Supabase 项目里：左下角 Settings（齿轮）→ API\n\n' +
+                '• Project URL 复制到上面第一栏\n' +
+                '• Project API keys 里选 anon public，复制到第二栏\n\n' +
+                '这两个是公开信息，放在网页里是安全的，数据由数据库的行级权限保护。');
+        });
+    }
+
+    // ───────────────────────── 启动 ─────────────────────────
+    function enterApp(user) {
+        currentUser = user;
+        records = loadRecords();
+        lastSyncAt = Number(localStorage.getItem('sb_last_sync') || 0) || 0;
+
+        if (!booted) {
+            booted = true;
+            if (typeof init === 'function') init();
+        } else if (typeof renderAll === 'function') {
+            renderAll();
+        }
+
+        hideLogin();
+        hideSetup();
+        setStatus(navigator.onLine ? 'syncing' : 'offline', navigator.onLine ? '同步中…' : '离线');
+        renderAccountPanel();
+        scheduleSync(150);
+        setTimeout(migrateGuestData, 700);
+    }
+
+    function boot() {
+        loadCfg();
+        restoreSession();
+        wireLoginUI();
+        wireAccountUI();
+
+        if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')) {
+            navigator.serviceWorker.register('./sw.js').catch(() => {});
+        }
+
+        window.addEventListener('online', () => { toast('网络已恢复，正在同步…', 1200); syncNow(); });
+        window.addEventListener('offline', () => setStatus('offline', '离线，联网后自动同步'));
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState !== 'visible' || !SESSION.access) return;
+            if (Date.now() - lastVisibleSync < 20000) return;
+            lastVisibleSync = Date.now();
+            syncNow();
+        });
+
+        setInterval(() => {
+            if (document.visibilityState === 'visible' && SESSION.access && !syncing) syncNow();
+        }, 60000);
+
+        if (!hasCfg()) {
+            setStatus('offline', '未连接服务器');
+            showSetup();
+            return;
+        }
+        if (SESSION.refresh && SESSION.user) {
+            enterApp(SESSION.user);
+        } else {
+            setStatus('offline', '未登录');
+            showLogin('login');
+        }
+    }
+
+    window.__boot = boot;
+    window.scheduleSync = scheduleSync;
+    window.SyncNow = syncNow;
+})();
