@@ -394,20 +394,36 @@
         btn.disabled = true;
         btn.textContent = '连接中…';
         try {
-            const res = await fetch(url + '/rest/v1/records?select=id&limit=1', {
-                headers: { apikey: key, Authorization: 'Bearer ' + key },
+            // ① 只校验「地址 + Key 是否有效」：/auth/v1/settings 是公开端点，不涉及表权限
+            const settingsRes = await fetch(url + '/auth/v1/settings', {
+                headers: { apikey: key },
             });
-            if (res.status === 401 || res.status === 403) throw new Error('Key 不对或没有权限（要用 anon public key）');
-            if (res.status === 404) throw new Error('连上了，但没找到 records 表——SQL 建表脚本执行了吗？');
-            if (!res.ok && res.status !== 206) throw new Error('连接失败（HTTP ' + res.status + '）');
+            if (settingsRes.status === 401 || settingsRes.status === 403) {
+                throw new Error('Key 无效。要复制 anon public 那一条，不是 service_role');
+            }
+            if (!settingsRes.ok) throw new Error('连接失败（HTTP ' + settingsRes.status + '）');
+            const settings = await settingsRes.json().catch(() => ({}));
+
+            // ② 再看表建没建。注意：表已经开了行级权限时，匿名读会被拒绝（401/403），
+            //    这是正常且安全的表现，不能当成错误；只有 404 才说明表不存在。
+            const tableRes = await fetch(url + '/rest/v1/records?select=id&limit=1', {
+                headers: { apikey: key },
+            });
+            if (tableRes.status === 404) {
+                throw new Error('连上了，但没找到 records 表 —— schema.sql 还没执行或没跑成功');
+            }
 
             saveCfg(url, key);
             hideSetup();
             showLogin('login');
-            toast('服务器已连接');
+            if (settings && settings.mailer_autoconfirm === false) {
+                toast('已连接。注意：此项目开启了邮箱确认，注册后需点邮件里的链接', 4200);
+            } else {
+                toast('服务器已连接');
+            }
         } catch (e) {
             errEl.textContent = /Failed to fetch|NetworkError|load failed/i.test(e.message)
-                ? '连不上，检查地址是否填错、或网络是否被挡'
+                ? '连不上：检查地址是否填错、或网络是否被挡'
                 : (e.message || '连接失败');
         } finally {
             btn.disabled = false;
