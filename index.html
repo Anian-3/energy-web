@@ -1469,12 +1469,14 @@
         .perkm-main {
             display: flex;
             gap: 10px;
+            align-items: stretch;
         }
         .pk {
-            flex: 1;
+            flex: 1 1 0;
+            min-width: 0;
             background: #f8fafc;
-            border-radius: 12px;
-            padding: 10px 12px;
+            border-radius: 14px;
+            padding: 10px 12px 12px;
             display: flex;
             flex-direction: column;
             gap: 2px;
@@ -1487,6 +1489,26 @@
             line-height: 1.2;
         }
         .pk-unit { font-size: 11px; color: #94a3b8; }
+        .pk-split {
+            display: flex;
+            gap: 6px;
+            margin-top: 10px;
+        }
+        .pk-split .pk-tag {
+            flex: 1 1 0;
+            min-width: 0;
+            text-align: center;
+            padding: 5px 4px;
+            border-radius: 9px;
+            font-size: 10.5px;
+            line-height: 1.2;
+        }
+        .pk-split .pk-tag b {
+            display: block;
+            font-size: 13px;
+            font-weight: 700;
+            margin-top: 2px;
+        }
         .perkm-split {
             display: flex;
             gap: 8px;
@@ -1847,16 +1869,20 @@
                 <span class="pk-label">本月</span>
                 <span class="pk-value" id="pkMonth">—</span>
                 <span class="pk-unit">元 / 公里</span>
+                <div class="pk-split" id="pkSplitMonth" style="display:none">
+                    <span class="pk-tag e">用电<b id="pkEvMonth">—</b></span>
+                    <span class="pk-tag g">用油<b id="pkFuelMonth">—</b></span>
+                </div>
             </div>
             <div class="pk">
                 <span class="pk-label">累计</span>
                 <span class="pk-value" id="pkTotal">—</span>
                 <span class="pk-unit">元 / 公里</span>
+                <div class="pk-split" id="pkSplitTotal" style="display:none">
+                    <span class="pk-tag e">用电<b id="pkEvTotal">—</b></span>
+                    <span class="pk-tag g">用油<b id="pkFuelTotal">—</b></span>
+                </div>
             </div>
-        </div>
-        <div class="perkm-split" id="pkSplit" style="display:none">
-            <span class="pk-tag e">用电 <b id="pkEv">—</b></span>
-            <span class="pk-tag g">用油 <b id="pkFuel">—</b></span>
         </div>
         <div class="perkm-foot" id="pkFoot">还没有里程记录</div>
     </div>

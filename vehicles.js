@@ -588,6 +588,26 @@
         return '¥' + n.toFixed(2);
     }
 
+    /** 用电 / 用油 两个小标签：本月和累计各一组 */
+    function renderSplit(suffix, v, r) {
+        const box = byId('pkSplit' + suffix);
+        if (!box) return;
+        const show = v.type === 'hybrid' && r.ok && (r.evPerKm != null || r.fuelPerKm != null);
+        box.style.display = show ? '' : 'none';
+        if (!show) return;
+        const ev = byId('pkEv' + suffix);
+        const fuel = byId('pkFuel' + suffix);
+        if (ev) ev.textContent = r.evPerKm != null ? fmtMoney(r.evPerKm) : '—';
+        if (fuel) fuel.textContent = r.fuelPerKm != null ? fmtMoney(r.fuelPerKm) : '—';
+    }
+
+    function hideSplits() {
+        ['pkSplitMonth', 'pkSplitTotal'].forEach((id) => {
+            const el = byId(id);
+            if (el) el.style.display = 'none';
+        });
+    }
+
     function renderPerKm() {
         const card = byId('perkmCard');
         if (!card) return;
@@ -595,7 +615,7 @@
         if (isAllMode()) {
             byId('pkMonth').textContent = '—';
             byId('pkTotal').textContent = '—';
-            byId('pkSplit').style.display = 'none';
+            hideSplits();
             byId('pkFoot').textContent = '「全部车辆」不计算每公里，请选择具体某辆车';
             byId('mileageBtn').style.display = 'none';
             return;
@@ -605,7 +625,7 @@
         if (!v) {
             byId('pkMonth').textContent = '—';
             byId('pkTotal').textContent = '—';
-            byId('pkSplit').style.display = 'none';
+            hideSplits();
             byId('pkFoot').textContent = '请先添加一辆车';
             byId('mileageBtn').style.display = 'none';
             return;
@@ -624,14 +644,8 @@
         byId('pkMonth').textContent = monthR.ok ? fmtMoney(monthR.perKm) : '—';
         byId('pkTotal').textContent = totalR.ok ? fmtMoney(totalR.perKm) : '—';
 
-        const split = byId('pkSplit');
-        if (v.type === 'hybrid' && monthR.ok && (monthR.evPerKm != null || monthR.fuelPerKm != null)) {
-            split.style.display = '';
-            byId('pkEv').textContent = monthR.evPerKm != null ? fmtMoney(monthR.evPerKm) : '—';
-            byId('pkFuel').textContent = monthR.fuelPerKm != null ? fmtMoney(monthR.fuelPerKm) : '—';
-        } else {
-            split.style.display = 'none';
-        }
+        renderSplit('Month', v, monthR);
+        renderSplit('Total', v, totalR);
 
         // 把分子 / 分母 / 读数区间全部摊开，避免"数字对不上"
         const lines = [];
