@@ -343,10 +343,10 @@
             .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : (a.createdAt || 0) - (b.createdAt || 0)));
     }
 
-    function openMileageSheet() {
+    function openMileageSheet(dateOverride) {
         const v = currentVehicle();
         if (!v) { toast('先选择一辆车'); return; }
-        byId('odoDate').value = typeof getTodayStr === 'function' ? getTodayStr() : new Date().toISOString().slice(0, 10);
+        byId('odoDate').value = dateOverride || (typeof getTodayStr === 'function' ? getTodayStr() : new Date().toISOString().slice(0, 10));
         byId('odoTotal').value = '';
         byId('odoEv').value = '';
         if (byId('odoFuel')) byId('odoFuel').value = '';
@@ -619,6 +619,7 @@
 
         const monthR = calcRange(v.id, mr.from, mr.to);
         const totalR = calcRange(v.id, '', '');
+        needMonthStartDate = monthR.ok ? '' : mr.from;
 
         byId('pkMonth').textContent = monthR.ok ? fmtMoney(monthR.perKm) : '—';
         byId('pkTotal').textContent = totalR.ok ? fmtMoney(totalR.perKm) : '—';
@@ -652,13 +653,21 @@
         }
 
         const foot = byId('pkFoot');
-        foot.innerHTML = lines.map(escapeHtml).join('<br />');
+        let html = lines.map(escapeHtml).join('<br />');
+        if (!monthR.ok && needMonthStartDate) {
+            html += '<br /><a href="#" id="pkBackfill" style="color:#2563eb;text-decoration:none;">→ 补记 ' +
+                escapeHtml(needMonthStartDate.slice(0, 7)) + ' 月初读数</a>';
+        }
+        foot.innerHTML = html;
         foot.style.lineHeight = '1.75';
         foot.style.fontSize = '11px';
     }
 
     // ───────────────────────── 渲染入口 ─────────────────────────
     let promptedVehicle = false;
+
+    // 本月缺起点读数时，点「记里程」默认带出本月 1 号
+    let needMonthStartDate = '';
 
     function maybePromptVehicle() {
         if (promptedVehicle) return;
@@ -704,7 +713,18 @@
         if (cancel) cancel.addEventListener('click', () => { editingVehicleId = ''; fillVehicleForm(); });
 
         const mBtn = byId('mileageBtn');
-        if (mBtn) mBtn.addEventListener('click', openMileageSheet);
+        if (mBtn) mBtn.addEventListener('click', () => openMileageSheet());
+
+        // 「补记月初读数」是独立入口，不影响主按钮默认今天
+        const pkFoot = byId('pkFoot');
+        if (pkFoot) {
+            pkFoot.addEventListener('click', (e) => {
+                const a = e.target.closest('#pkBackfill');
+                if (!a) return;
+                e.preventDefault();
+                openMileageSheet(needMonthStartDate);
+            });
+        }
         const mOverlay = byId('mileageOverlay');
         if (mOverlay) mOverlay.addEventListener('click', closeMileageSheet);
         const mClose = byId('mileageClose');
