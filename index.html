@@ -882,6 +882,39 @@
             box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
         }
 
+        /* ===== 记账第二行：备注 + 添加 ===== */
+        .add-form .form-row.row-note {
+            margin-top: 8px;
+            flex-wrap: nowrap;
+            gap: 8px;
+        }
+        .add-form .form-row.row-note .note-input {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+        .add-form .form-row.row-note .submit-btn {
+            flex: 0 0 auto;
+            white-space: nowrap;
+        }
+
+        /* ===== 页脚版本号 ===== */
+        .app-footer {
+            text-align: center;
+            padding: 4px 0 26px;
+        }
+        .ver-link {
+            border: none;
+            background: none;
+            color: #94a3b8;
+            font-size: 11.5px;
+            font-family: inherit;
+            cursor: pointer;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            padding: 6px 10px;
+        }
+        .ver-link:active { color: #64748b; }
+
         /* ===== 浮动按钮 ===== */
         .fab {
             position: fixed;
@@ -1789,6 +1822,88 @@
         <div class="mileage-list" id="mileageList"></div>
     </div>
 
+    <!-- ===== 更新日志（全屏） ===== -->
+    <div class="guide-screen hidden" id="changelogScreen">
+        <div class="guide-head">
+            <span class="guide-title">更新日志</span>
+            <button class="guide-close" id="changelogClose" title="关闭">✕</button>
+        </div>
+        <div class="guide-body" id="changelogBody">
+            <h2>v1.4.1 · 2026-10-31</h2>
+            <ul>
+                <li>备注输入框独占一行，能写更多字（上限 20 → 50）</li>
+                <li>页面底部新增版本入口，可查看本更新日志</li>
+            </ul>
+
+            <h2>v1.4 · 2026-10-30</h2>
+            <ul>
+                <li>账号名只允许字母、数字、下划线（不再支持中文，避免注册失败）</li>
+                <li>每公里花费支持两种算法：
+                    <ul>
+                        <li><strong>每次加满</strong> → 满箱法，油箱里剩的油不算已花成本</li>
+                        <li><strong>定额加油</strong> → 按实际花费估算</li>
+                    </ul>
+                </li>
+                <li>行驶不足 100 km 时不再给出每公里数字（避免“50 元/公里”这种离谱值）</li>
+                <li>记完一笔自动弹出里程录入（可跳过、可永久关闭）</li>
+                <li>标题下显示版本号</li>
+                <li>内置使用说明页（顶栏 ❓ 或账号面板）</li>
+            </ul>
+
+            <h2>v1.3.2 · 2026-10-30</h2>
+            <ul>
+                <li>导出 Excel 新增「里程记录」「车辆」两张表</li>
+                <li>导入可一次性恢复<strong>车辆 + 记录 + 里程</strong>，重复导入不会产生重复数据</li>
+            </ul>
+
+            <h2>v1.3.1 · 2026-10-30</h2>
+            <ul>
+                <li>修正每公里算法：分子分母统一到同一时间段</li>
+                <li>当月没有里程读数时显示「—」，不再硬算</li>
+                <li>修复小数里程导致的同步失败</li>
+                <li>同名账号重新注册不再继承别人的本地数据（需选「迁移」或「归档」）</li>
+                <li>「清空」按钮改为只清记录与里程，车辆保留</li>
+                <li>刷新后记住上次选中的车辆</li>
+            </ul>
+
+            <h2>v1.3 · 2026-10-30</h2>
+            <ul>
+                <li>一个账号支持<strong>多辆车</strong>，顶部一键切换</li>
+                <li>车辆分三类：燃油车 / 纯电车 / 混动车，记账类型随车型限制</li>
+                <li>新增<strong>每公里花费</strong>（本月 / 累计）</li>
+                <li>新增<strong>里程录入</strong>：总里程必填，纯电 / 燃油任填一个，另一个自动算</li>
+                <li>混动车可分别查看「用电」「用油」每公里</li>
+            </ul>
+
+            <h2>v1.2 · 2026-10-30</h2>
+            <ul>
+                <li>改为<strong>免服务器架构</strong>：网页挂在 GitHub Pages，数据存 Supabase</li>
+                <li>首次打开填两个配置值即可连接（每台设备一次）</li>
+                <li><strong>行级权限</strong>：每个账号只能读写自己的数据</li>
+                <li><strong>自动心跳</strong>：每天 3 次，避免免费数据库因长期不用被暂停</li>
+            </ul>
+
+            <h2>v1.1 · 2026-10-30</h2>
+            <ul>
+                <li>新增<strong>账号密码登录</strong></li>
+                <li><strong>多端同步</strong>：手机、电脑登录同一账号自动互通</li>
+                <li><strong>离线也能记账</strong>，联网自动补传</li>
+                <li>可装到手机桌面，断网也能打开</li>
+                <li>图表与 Excel 读写改为内置，不再依赖国外 CDN</li>
+                <li>云端数据意外清空时，本机数据会自动补传</li>
+            </ul>
+
+            <h2>v1.0 · 2026-10-29</h2>
+            <ul>
+                <li>最初的本地记账版</li>
+                <li>月历视图（每天金额 + 充电蓝点 / 加油橙点）</li>
+                <li>每日花费趋势折线图</li>
+                <li>年度汇总（逐月明细 + 历年对比）</li>
+                <li>Excel 导入导出</li>
+            </ul>
+        </div>
+    </div>
+
     <!-- ===== 使用说明（全屏） ===== -->
     <div class="guide-screen hidden" id="guideScreen">
         <div class="guide-head">
@@ -2047,6 +2162,11 @@
         </div>
     </div>
 
+    <!-- ===== 页脚：版本号 / 更新日志 ===== -->
+    <div class="app-footer">
+        <button class="ver-link" id="verLink" title="查看更新日志">version 1.4.1</button>
+    </div>
+
     <!-- ===== 浮动按钮 ===== -->
     <button class="fab" id="fabAdd">+</button>
 
@@ -2076,7 +2196,9 @@
                 <label class="points-checkbox" id="pointsLabel">
                     <input type="checkbox" id="usePoints" /> 🎫 积分
                 </label>
-                <input class="note-input" id="inputNote" type="text" placeholder="备注（选填）" maxlength="20" />
+            </div>
+            <div class="form-row row-note">
+                <input class="note-input" id="inputNote" type="text" placeholder="备注（选填）" maxlength="50" />
                 <button class="submit-btn" id="submitRecord">添加</button>
             </div>
         </div>
@@ -2088,7 +2210,7 @@
         // ================================================================
         // 旧版本用过的键名，登录后可作为「旧数据」导入
         // 应用版本号：升级时只改这一处
-        const APP_VERSION = 'v1.4';
+        const APP_VERSION = 'v1.4.1';
 
         const LEGACY_KEY = 'hybrid_energy_records';
 
@@ -3552,6 +3674,8 @@
             if (el) el.textContent = ' · ' + APP_VERSION;
             const acct = document.getElementById('acctVersion');
             if (acct) acct.textContent = APP_VERSION;
+            const foot = document.getElementById('verLink');
+            if (foot) foot.textContent = 'version ' + APP_VERSION.replace(/^v/, '');
         }
 
         document.addEventListener('DOMContentLoaded', function () {
