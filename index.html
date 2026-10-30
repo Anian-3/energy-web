@@ -1295,6 +1295,18 @@
 }
 .login-submit:active { transform: scale(0.98); }
 .login-submit:disabled { opacity: 0.6; }
+.login-ver {
+    text-align: center;
+    font-size: 11.5px;
+    color: #b6c2d1;
+    margin-top: 10px;
+}
+.login-ver .sep { margin: 0 6px; }
+.login-ver a {
+    color: #94a3b8;
+    text-decoration: none;
+}
+.login-ver a:active { color: #64748b; }
 .login-foot {
     font-size: 11.5px;
     color: #94a3b8;
@@ -1943,6 +1955,11 @@
 
         <div class="login-foot" id="authFoot">
             同一账号在手机、电脑登录后，记录自动互通<br />数据只存在你自己的服务器上
+        </div>
+        <div class="login-ver">
+            <span id="loginVersion">version 1.4.1</span>
+            <span class="sep">·</span>
+            <a href="#" id="loginChangelog">更新日志</a>
         </div>
     </div>
 </div>
@@ -3676,6 +3693,8 @@
             if (acct) acct.textContent = APP_VERSION;
             const foot = document.getElementById('verLink');
             if (foot) foot.textContent = 'version ' + APP_VERSION.replace(/^v/, '');
+            const loginVer = document.getElementById('loginVersion');
+            if (loginVer) loginVer.textContent = 'version ' + APP_VERSION.replace(/^v/, '');
         }
 
         document.addEventListener('DOMContentLoaded', function () {

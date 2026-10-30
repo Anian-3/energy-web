@@ -679,6 +679,15 @@
         if (chClose) {
             chClose.addEventListener('click', () => byId('changelogScreen').classList.add('hidden'));
         }
+
+        // 登录页底部的「更新日志」
+        const loginLog = byId('loginChangelog');
+        if (loginLog) {
+            loginLog.addEventListener('click', (e) => {
+                e.preventDefault();
+                byId('changelogScreen').classList.remove('hidden');
+            });
+        }
         byId('acctMask').addEventListener('click', closeAccount);
         byId('acctSync').addEventListener('click', () => { toast('正在同步…', 900); syncNow({ manual: true }); });
         byId('acctPwdBtn').addEventListener('click', () => {
