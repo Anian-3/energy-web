@@ -105,7 +105,33 @@
     function resolveVehicleId(rec) {
         if (rec && rec.vehicleId) return rec.vehicleId;
         const list = vehicles();
-        return list.length ? list[0].id : '';
+        if (!list.length) return '';
+        // 没有归属的记录：优先挂到「类型能装下它」的车，别一律塞给第一辆
+        if (rec && rec.type) {
+            const match = list.find((v) => (TYPES[v.type] || TYPES.hybrid).kinds.indexOf(rec.type) >= 0);
+            if (match) return match.id;
+        }
+        return list[0].id;
+    }
+
+    /** 某车型允许的记账类型 */
+    function allowedKinds(type) {
+        return (TYPES[type] || TYPES.hybrid).kinds;
+    }
+
+    function typeLabel(type) {
+        return (TYPES[type] || TYPES.hybrid).label;
+    }
+
+    /** 扫描「记录类型 vs 所属车辆类型」冲突 */
+    function conflicts() {
+        const out = [];
+        DB.visibleRecords().forEach((r) => {
+            const v = vehicleById(resolveVehicleId(r));
+            if (!v) return;
+            if (allowedKinds(v.type).indexOf(r.type) < 0) out.push({ rec: r, vehicle: v });
+        });
+        return out;
     }
 
     /** 记住「上次选中的车」，刷新后不跳回「全部」 */
@@ -353,6 +379,32 @@
         const now = Date.now();
         const existing = editingVehicleId ? all.find((x) => x.id === editingVehicleId) : null;
 
+        if (existing && existing.type !== type) {
+            // 车型改小（混动→燃油/电车）时，历史记录可能对不上，先确认
+            const kinds = allowedKinds(type);
+            const bad = DB.visibleRecords().filter(
+                (r) => resolveVehicleId(r) === existing.id && kinds.indexOf(r.type) < 0
+            );
+            if (bad.length) {
+                const what = bad.some((r) => r.type === 'electric') ? '充电' : '加油';
+                const ok = confirm(
+                    '「' + name + '」有 ' + bad.length + ' 条' + what + '记录，改成「' + typeLabel(type) + '」后这些记录没有意义。\n\n' +
+                    '继续会把它们删除（其他设备也会同步删除）。'
+                );
+                if (!ok) return;
+                const recs = DB.table('records');
+                const ts = Date.now();
+                let removed = 0;
+                bad.forEach((b) => {
+                    const t = recs.find((x) => x.id === b.id);
+                    if (t) { t.deleted = 1; t.updatedAt = ts; t.dirty = 1; removed++; }
+                });
+                DB.saveTable('records', recs);
+                records = loadRecords();
+                if (removed) toast('已删除 ' + removed + ' 条冲突记录', 2400);
+            }
+        }
+
         if (existing) {
             existing.name = name;
             existing.type = type;
@@ -382,6 +434,77 @@
         fillVehicleForm();
         if (typeof renderAll === 'function') renderAll();
         if (typeof scheduleSync === 'function') scheduleSync(800);
+    }
+
+    // ───────────────────────── 数据检查（类型冲突） ─────────────────────────
+    let conflictToastShown = false;
+
+    function refreshConflictUI() {
+        const list = conflicts();
+        const row = byId('acctConflictRow');
+        const val = byId('acctConflict');
+        if (row) row.style.display = list.length ? '' : 'none';
+        if (val) val.textContent = list.length + ' 条';
+        if (list.length && !conflictToastShown && typeof toast === 'function') {
+            conflictToastShown = true;
+            setTimeout(() => toast('发现 ' + list.length + ' 条记录与车型不符，账号面板可处理', 3200), 1500);
+        }
+    }
+
+    function renderConflictList() {
+        const box = byId('conflictList');
+        if (!box) return;
+        const list = conflicts();
+        if (!list.length) {
+            box.innerHTML = '<div class="empty-msg">没有发现冲突，数据是干净的</div>';
+            return;
+        }
+        box.innerHTML = list
+            .slice()
+            .sort((a, b) => (a.rec.date < b.rec.date ? 1 : -1))
+            .map(({ rec, vehicle }) => {
+                const icon = rec.type === 'electric' ? '⚡' : '⛽';
+                const kind = rec.type === 'electric' ? '充电' : '加油';
+                return '<div class="orow">' +
+                    '<div class="orow-main">' +
+                    '<div class="orow-amount">' + icon + ' ' + kind + ' ¥' + (Number(rec.amount) || 0).toFixed(2) + '</div>' +
+                    '<div class="orow-sub">' + rec.date + ' · 挂在「' + vehicle.name + '」(' + typeLabel(vehicle.type) + ')' +
+                    (rec.note ? ' · ' + rec.note : '') + '</div>' +
+                    '</div>' +
+                    '<button class="orow-del" data-del="' + rec.id + '">✕</button>' +
+                    '</div>';
+            })
+            .join('');
+        box.querySelectorAll('button[data-del]').forEach((btn) => {
+            btn.addEventListener('click', () => deleteConflict(btn.dataset.del));
+        });
+    }
+
+    function deleteConflict(id) {
+        const recs = DB.table('records');
+        const target = recs.find((x) => x.id === id);
+        if (!target) return;
+        const now = Date.now();
+        target.deleted = 1;
+        target.updatedAt = now;
+        target.dirty = 1;
+        DB.saveTable('records', recs);
+        records = loadRecords();
+        if (typeof renderAll === 'function') renderAll();
+        if (typeof scheduleSync === 'function') scheduleSync(500);
+        renderConflictList();
+        toast('已删除这条冲突记录', 2000);
+    }
+
+    function openConflictSheet() {
+        renderConflictList();
+        byId('conflictSheet').classList.add('active');
+        byId('conflictOverlay').classList.add('active');
+    }
+
+    function closeConflictSheet() {
+        byId('conflictSheet').classList.remove('active');
+        byId('conflictOverlay').classList.remove('active');
     }
 
     function deleteVehicle(id) {
@@ -948,6 +1071,18 @@
         // 打开记账面板时，按当前车型限制可选的能源类型
         const fab = byId('fabAdd');
         if (fab) fab.addEventListener('click', () => setTimeout(applyTypeConstraints, 50));
+
+        const conflictClose = byId('conflictClose');
+        if (conflictClose) conflictClose.addEventListener('click', closeConflictSheet);
+        const conflictOverlay = byId('conflictOverlay');
+        if (conflictOverlay) conflictOverlay.addEventListener('click', closeConflictSheet);
+        const acctConflictRow = byId('acctConflictRow');
+        if (acctConflictRow) {
+            acctConflictRow.addEventListener('click', () => {
+                if (typeof closeAccount === 'function') closeAccount();
+                openConflictSheet();
+            });
+        }
     }
 
     // ───────────────────────── 工具 ─────────────────────────
@@ -973,6 +1108,10 @@
         renderVehicleBar,
         renderPerKm,
         applyTypeConstraints,
+        allowedKinds,
+        typeLabel,
+        conflicts,
+        refreshConflictUI,
         openVehicleSheet,
         openMileageSheet,
         afterAddRecord,

@@ -898,6 +898,9 @@
         }
 
         /* ===== 页脚版本号 ===== */
+        .acct-item.acct-warn { cursor: pointer; }
+        .acct-item.acct-warn .v { color: #b45309; font-weight: 600; }
+
         .app-footer {
             text-align: center;
             padding: 4px 0 26px;
@@ -1850,6 +1853,20 @@
         </div>
     </div>
 
+    <!-- ===== 数据检查（类型冲突） ===== -->
+    <div class="overlay" id="conflictOverlay"></div>
+    <div class="bottom-sheet" id="conflictSheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+            <span class="date-title">数据检查</span>
+            <button class="close-btn" id="conflictClose">✕</button>
+        </div>
+        <div class="hint" style="margin:0 0 10px;line-height:1.6;">
+            下面这些记录的「类型」和所属车辆对不上（常见于改了车型，或早期还没有车辆时记的账）。删除后金额会从统计里去掉。
+        </div>
+        <div class="mileage-list" id="conflictList"></div>
+    </div>
+
     <!-- ===== 里程 ===== -->
     <div class="overlay" id="mileageOverlay"></div>
     <div class="bottom-sheet" id="mileageSheet">
@@ -1884,6 +1901,19 @@
             <button class="guide-close" id="changelogClose" title="关闭">✕</button>
         </div>
         <div class="guide-body" id="changelogBody">
+            <h2>v1.4.2 · 2026-10-31</h2>
+            <ul>
+                <li>修复：燃油车 / 纯电车下仍能记错类型的问题（例如燃油车记出充电）
+                    <ul>
+                        <li>保存时校验车型，不允许的类型直接拦下</li>
+                        <li>改车型时提示冲突记录，可一并删除</li>
+                        <li>没有归属的历史记录改为按类型匹配车辆</li>
+                        <li>账号面板新增「⚠️ 数据检查」，可手动清理冲突记录</li>
+                    </ul>
+                </li>
+                <li>调整部分 UI 与布局：里程面板间距与窄屏排列、自动提醒改为勾选框、登录页版本号入口</li>
+            </ul>
+
             <h2>v1.4.1 · 2026-10-31</h2>
             <ul>
                 <li>备注输入框独占一行，能写更多字（上限 20 → 50）</li>
@@ -2033,6 +2063,10 @@
         <div class="acct-item">
             <span class="k">版本</span>
             <span class="v" id="acctVersion">—</span>
+        </div>
+        <div class="acct-item acct-warn" id="acctConflictRow" style="display:none">
+            <span class="k">⚠️ 数据检查</span>
+            <span class="v" id="acctConflict">0 条</span>
         </div>
     </div>
 
@@ -2268,7 +2302,7 @@
         // ================================================================
         // 旧版本用过的键名，登录后可作为「旧数据」导入
         // 应用版本号：升级时只改这一处
-        const APP_VERSION = 'v1.4.1';
+        const APP_VERSION = 'v1.4.2';
 
         const LEGACY_KEY = 'hybrid_energy_records';
 
@@ -3537,6 +3571,9 @@
 
         function renderAll() {
             if (window.Vehicles) window.Vehicles.renderVehicleUI();
+            if (window.Vehicles && window.Vehicles.refreshConflictUI) {
+                try { window.Vehicles.refreshConflictUI(); } catch (e) { /* 忽略 */ }
+            }
             if (viewMode === 'monthly') {
                 renderMonthlyView();
             } else {
@@ -3601,6 +3638,18 @@
             }
             const note = inputNote.value.trim();
             const usePoints = document.getElementById('usePoints').checked;
+
+            // 车型校验：燃油车不能记充电、纯电车不能记加油
+            const curV = window.Vehicles && window.Vehicles.currentVehicle ? window.Vehicles.currentVehicle() : null;
+            if (curV && window.Vehicles.allowedKinds) {
+                const kinds = window.Vehicles.allowedKinds(curV.type);
+                if (kinds.indexOf(currentType) < 0) {
+                    const what = currentType === 'electric' ? '充电' : '加油';
+                    showToast('「' + curV.name + '」是' + window.Vehicles.typeLabel(curV.type) + '，不能记' + what, 2600);
+                    if (typeof updateTypeToggle === 'function') updateTypeToggle(kinds[0]);
+                    return;
+                }
+            }
 
             if (addRecord(date, currentType, amount, note, usePoints)) {
                 showToast(`✅ 已记录 ${currentType === 'electric' ? '充电' : '加油'} ${formatAmount(amount)}${usePoints ? ' 🎫积分' : ''}`);
