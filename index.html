@@ -775,11 +775,14 @@
             flex-shrink: 0;
         }
         .record-item .veh-tag {
-            font-size: 11.5px;
-            color: #64748b;
-            background: #eef2f7;
-            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #0f766e;
+            background: #d9f2ec;
+            border: 1px solid #b7e4da;
+            border-radius: 7px;
             padding: 1px 7px;
+            letter-spacing: 0.2px;
             max-width: 7em;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -2025,6 +2028,12 @@
             <button class="guide-close" id="changelogClose" title="关闭">✕</button>
         </div>
         <div class="guide-body" id="changelogBody">
+            <h2>v1.4.5 · 2026-10-31</h2>
+            <ul>
+                <li>UI：日期详情里的车辆名标签改成青绿色小徽章，和后面的灰色备注文字区分开，一眼能看出「哪个是车、哪个是备注」</li>
+                <li>使用说明同步更新：趋势图图例勾选、车辆条横滑、「全部」视图下选车记账、导出文件名、数据检查等</li>
+            </ul>
+
             <h2>v1.4.4 · 2026-10-31</h2>
             <ul>
                 <li>UI：车辆切换条支持横向滑动，车辆多时长车名自动省略，不再挤成一团</li>
@@ -2449,7 +2458,7 @@
         // ================================================================
         // 旧版本用过的键名，登录后可作为「旧数据」导入
         // 应用版本号：升级时只改这一处
-        const APP_VERSION = 'v1.4.4';
+        const APP_VERSION = 'v1.4.5';
 
         const LEGACY_KEY = 'hybrid_energy_records';
 
