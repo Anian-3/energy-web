@@ -670,24 +670,8 @@
         const guideClose = byId('guideClose');
         if (guideClose) guideClose.addEventListener('click', closeGuide);
 
-        // 页脚版本号 → 更新日志
-        const verLink = byId('verLink');
-        if (verLink) {
-            verLink.addEventListener('click', () => byId('changelogScreen').classList.remove('hidden'));
-        }
-        const chClose = byId('changelogClose');
-        if (chClose) {
-            chClose.addEventListener('click', () => byId('changelogScreen').classList.add('hidden'));
-        }
-
-        // 登录页底部的「更新日志」
-        const loginLog = byId('loginChangelog');
-        if (loginLog) {
-            loginLog.addEventListener('click', (e) => {
-                e.preventDefault();
-                byId('changelogScreen').classList.remove('hidden');
-            });
-        }
+        // 页脚 / 登录页的版本号 → 更新日志，统一在 index.html 的内联脚本里绑定
+        // （避免这个文件没更新时入口失效）
         byId('acctMask').addEventListener('click', closeAccount);
         byId('acctSync').addEventListener('click', () => { toast('正在同步…', 900); syncNow({ manual: true }); });
         byId('acctPwdBtn').addEventListener('click', () => {

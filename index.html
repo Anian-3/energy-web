@@ -1957,9 +1957,7 @@
             同一账号在手机、电脑登录后，记录自动互通<br />数据只存在你自己的服务器上
         </div>
         <div class="login-ver">
-            <span id="loginVersion">version 1.4.1</span>
-            <span class="sep">·</span>
-            <a href="#" id="loginChangelog">更新日志</a>
+            <button class="ver-link" id="loginVerLink" title="查看更新日志">version 1.4.1</button>
         </div>
     </div>
 </div>
@@ -3693,12 +3691,35 @@
             if (acct) acct.textContent = APP_VERSION;
             const foot = document.getElementById('verLink');
             if (foot) foot.textContent = 'version ' + APP_VERSION.replace(/^v/, '');
-            const loginVer = document.getElementById('loginVersion');
+            const loginVer = document.getElementById('loginVerLink');
             if (loginVer) loginVer.textContent = 'version ' + APP_VERSION.replace(/^v/, '');
+        }
+
+        /** 更新日志的开关：放在这里而不是同步模块里，避免外链脚本没更新时点不动 */
+        function wireChangelog() {
+            const open = () => {
+                const el = document.getElementById('changelogScreen');
+                if (el) el.classList.remove('hidden');
+            };
+            const close = () => {
+                const el = document.getElementById('changelogScreen');
+                if (el) el.classList.add('hidden');
+            };
+            ['verLink', 'loginVerLink'].forEach(function (id) {
+                const btn = document.getElementById(id);
+                if (!btn) return;
+                btn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    open();
+                });
+            });
+            const c = document.getElementById('changelogClose');
+            if (c) c.addEventListener('click', close);
         }
 
         document.addEventListener('DOMContentLoaded', function () {
             paintVersion();
+            wireChangelog();
             if (typeof window.__boot === 'function') window.__boot();
             else init();
         });
