@@ -1377,9 +1377,288 @@
     margin-top: 12px;
     line-height: 1.6;
 }
+
+        /* ===== 车辆切换条 ===== */
+        .vehicle-bar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 10px;
+        }
+        .vehicle-chips {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            flex: 1;
+            padding-bottom: 2px;
+        }
+        .vehicle-chips::-webkit-scrollbar { display: none; }
+        .vchip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            border: none;
+            background: rgba(255, 255, 255, 0.12);
+            color: rgba(255, 255, 255, 0.75);
+            border-radius: 20px;
+            padding: 5px 12px;
+            font-size: 13px;
+            font-family: inherit;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.18s;
+            flex: 0 0 auto;
+        }
+        .vchip.active {
+            background: #fff;
+            color: #1e293b;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+        }
+        .vchip.empty {
+            border: 1px dashed rgba(255, 255, 255, 0.45);
+            background: transparent;
+        }
+        .vchip-icon { font-size: 13px; }
+        .vehicle-add {
+            flex: 0 0 auto;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.16);
+            color: #fff;
+            font-size: 17px;
+            line-height: 1;
+            cursor: pointer;
+        }
+        .vehicle-add:active { background: rgba(255, 255, 255, 0.3); }
+
+        /* ===== 每公里花费卡片 ===== */
+        .perkm-card {
+            background: var(--card-bg);
+            margin: 0 16px 16px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 14px 16px 12px;
+        }
+        .perkm-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .perkm-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+        .perkm-btn {
+            border: none;
+            background: #eff6ff;
+            color: #2563eb;
+            font-size: 12.5px;
+            font-weight: 600;
+            font-family: inherit;
+            padding: 5px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+        .perkm-btn:active { background: #dbeafe; }
+        .perkm-main {
+            display: flex;
+            gap: 10px;
+        }
+        .pk {
+            flex: 1;
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .pk-label { font-size: 12px; color: var(--text-secondary); }
+        .pk-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text);
+            line-height: 1.2;
+        }
+        .pk-unit { font-size: 11px; color: #94a3b8; }
+        .perkm-split {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .pk-tag {
+            font-size: 12.5px;
+            padding: 5px 10px;
+            border-radius: 10px;
+            color: var(--text-secondary);
+        }
+        .pk-tag b { font-size: 13.5px; }
+        .pk-tag.e { background: var(--primary-e-light); color: #1d4ed8; }
+        .pk-tag.g { background: var(--primary-g-light); color: #b45309; }
+        .perkm-foot {
+            margin-top: 10px;
+            font-size: 11.5px;
+            color: #94a3b8;
+            line-height: 1.5;
+        }
+
+        /* ===== 车辆管理 / 里程面板 ===== */
+        #vehicleSheet, #mileageSheet { max-height: 86vh; overflow-y: auto; }
+        .vehicle-list { margin-bottom: 12px; }
+        .vrow {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: #f8fafc;
+            border-radius: 12px;
+            margin-bottom: 8px;
+        }
+        .vrow-main { display: flex; align-items: center; gap: 10px; }
+        .vrow-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 17px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+        }
+        .vrow-name { font-size: 14.5px; font-weight: 600; }
+        .vrow-sub { font-size: 11.5px; color: var(--text-secondary); margin-top: 1px; }
+        .vrow-ops { display: flex; gap: 6px; }
+        .vrow-ops button {
+            border: none;
+            background: #fff;
+            color: #475569;
+            font-size: 12.5px;
+            font-family: inherit;
+            padding: 6px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .vrow-ops button.danger { color: #dc2626; }
+        .vehicle-form {
+            background: #f8fafc;
+            border-radius: 14px;
+            padding: 14px;
+        }
+        .vf-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 10px; }
+        .vtype-toggle {
+            display: flex;
+            gap: 6px;
+            margin: 10px 0;
+        }
+        .vtype-toggle button {
+            flex: 1;
+            border: 1.5px solid #e2e8f0;
+            background: #fff;
+            border-radius: 10px;
+            padding: 9px 4px;
+            font-size: 12.5px;
+            font-family: inherit;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+        .vtype-toggle button.active {
+            border-color: var(--primary-e);
+            background: #eff6ff;
+            color: #1d4ed8;
+            font-weight: 600;
+        }
+        .vf-actions { display: flex; gap: 8px; margin-top: 12px; }
+        .vf-actions .submit-btn { flex: 1; }
+        .ghost-btn {
+            border: 1.5px solid #e2e8f0;
+            background: #fff;
+            color: var(--text-secondary);
+            border-radius: 12px;
+            padding: 11px 16px;
+            font-size: 14px;
+            font-family: inherit;
+            cursor: pointer;
+        }
+        .mileage-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+        .mileage-form .amount-input, .mileage-form .note-input { width: 100%; }
+        .mileage-form .hint { font-size: 11.5px; color: #94a3b8; margin-top: -2px; }
+        .mileage-list { max-height: 34vh; overflow-y: auto; }
+        .orow {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 9px 12px;
+            background: #f8fafc;
+            border-radius: 10px;
+            margin-bottom: 6px;
+        }
+        .orow-km { font-size: 14.5px; font-weight: 600; }
+        .orow-sub { font-size: 11.5px; color: var(--text-secondary); margin-top: 1px; }
+        .orow-del {
+            border: none;
+            background: transparent;
+            color: #cbd5e1;
+            font-size: 15px;
+            cursor: pointer;
+            padding: 4px 6px;
+        }
+        .orow-del:active { color: #ef4444; }
     </style>
 </head>
 <body>
+
+
+    <!-- ===== 车辆管理 ===== -->
+    <div class="overlay" id="vehicleOverlay"></div>
+    <div class="bottom-sheet" id="vehicleSheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+            <span class="date-title">车辆</span>
+            <button class="close-btn" id="vehClose">✕</button>
+        </div>
+        <div class="vehicle-list" id="vehicleList"></div>
+        <div class="vehicle-form" id="vehicleForm" data-type="hybrid">
+            <div class="vf-title" id="vehicleFormTitle">添加车辆</div>
+            <input class="note-input" id="vehName" type="text" placeholder="名称，如：小紫" maxlength="12" />
+            <div class="vtype-toggle" id="vehTypeToggle">
+                <button type="button" data-type="fuel">⛽ 燃油车</button>
+                <button type="button" data-type="ev">⚡ 纯电车</button>
+                <button type="button" data-type="hybrid" class="active">🔋 混动车</button>
+            </div>
+            <input class="note-input" id="vehStartOdo" type="number" inputmode="numeric" placeholder="初始里程 km（选填）" />
+            <div class="vf-actions">
+                <button class="submit-btn" id="vehSubmit">添加</button>
+                <button class="ghost-btn" id="vehCancel" style="display:none">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 里程 ===== -->
+    <div class="overlay" id="mileageOverlay"></div>
+    <div class="bottom-sheet" id="mileageSheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+            <span class="date-title">记录里程</span>
+            <button class="close-btn" id="mileageClose">✕</button>
+        </div>
+        <div class="mileage-form">
+            <input class="note-input" id="odoDate" type="date" />
+            <input class="amount-input" id="odoTotal" type="number" inputmode="numeric" placeholder="当前总里程（km）" />
+            <div id="odoEvField">
+                <input class="amount-input" id="odoEv" type="number" inputmode="numeric" placeholder="纯电里程（km，选填）" />
+                <div class="hint" id="odoEvHint">填了纯电里程，才能分别算出「用电 / 用油」每公里</div>
+            </div>
+            <button class="submit-btn" id="odoSubmit">保存</button>
+        </div>
+        <div class="mileage-list" id="mileageList"></div>
+    </div>
 
 <!-- ===== 登录 / 注册（新增） ===== -->
 <div class="login-screen hidden" id="loginScreen">
@@ -1483,6 +1762,12 @@
                 <button id="clearAllBtn" title="清除所有数据">🗑</button>
             </div>
         </div>
+
+        <!-- ===== 车辆切换 ===== -->
+        <div class="vehicle-bar" id="vehicleBar">
+            <div class="vehicle-chips" id="vehicleChips"></div>
+            <button class="vehicle-add" id="vehicleAddBtn" title="添加 / 管理车辆">＋</button>
+        </div>
         <div class="view-tabs" id="viewTabs">
             <button class="tab-btn active" data-view="monthly">📊 月度视图</button>
             <button class="tab-btn" data-view="annual">📈 年度汇总</button>
@@ -1545,6 +1830,32 @@
                 </div>
             </div>
         </div>
+    </div>
+
+
+    <!-- ===== 每公里花费 ===== -->
+    <div class="perkm-card" id="perkmCard">
+        <div class="perkm-head">
+            <span class="perkm-title">💸 每公里花费</span>
+            <button class="perkm-btn" id="mileageBtn">记里程</button>
+        </div>
+        <div class="perkm-main">
+            <div class="pk">
+                <span class="pk-label">本月</span>
+                <span class="pk-value" id="pkMonth">—</span>
+                <span class="pk-unit">元 / 公里</span>
+            </div>
+            <div class="pk">
+                <span class="pk-label">累计</span>
+                <span class="pk-value" id="pkTotal">—</span>
+                <span class="pk-unit">元 / 公里</span>
+            </div>
+        </div>
+        <div class="perkm-split" id="pkSplit" style="display:none">
+            <span class="pk-tag e">用电 <b id="pkEv">—</b></span>
+            <span class="pk-tag g">用油 <b id="pkFuel">—</b></span>
+        </div>
+        <div class="perkm-foot" id="pkFoot">还没有里程记录</div>
     </div>
 
     <!-- ===== 图表卡片 ===== -->
@@ -1630,108 +1941,137 @@
         // 旧版本用过的键名，登录后可作为「旧数据」导入
         const LEGACY_KEY = 'hybrid_energy_records';
 
-        // 当前登录账号（未登录为 null）；由 auth-sync.js 设置
+        // 当前登录账号（未登录为 null）；由 supabase-sync.js 设置
         let currentUser = null;
 
-        // 和服务端的同步游标（只增不减的序号，避免依赖设备时钟）
+        // 服务端同步游标
         let syncSeq = 0;
 
         /**
-         * 本地库：按账号隔离，账号之间互不串数据。
-         * 每条记录带 updatedAt（客户端修改时间，用于冲突判定）、dirty（待上传）、deleted（删除墓碑）。
+         * 本地库：按账号隔离，存三张表
+         *   vehicles  车辆（燃油 / 纯电 / 混动）
+         *   records   充电 / 加油记录
+         *   odometer  里程表读数
+         * 每行都带 updatedAt（修改时间，用于冲突判定）、dirty（待上传）、deleted（删除墓碑）
          */
         const DB = {
-            /**
-             * 用「账号名」而不是用户 id 做本地存储键。
-             * 这样即使云端数据库被重建、需要重新注册同名账号，本机数据依然接得上，
-             * 配合服务端序号回退检测可以自动把数据补回云端。
-             */
             key() {
                 const who = currentUser ? String(currentUser.username || '').toLowerCase() : 'guest';
                 return 'er_v2_u_' + who.replace(/[^\w\u4e00-\u9fa5.@+-]/g, '_');
             },
-            seqKey() {
-                return this.key() + '_seq';
-            },
-            lastKey() {
-                return this.key() + '_last';
-            },
-            all() {
+            seqKey() { return this.key() + '_seq'; },
+            lastKey() { return this.key() + '_last'; },
+
+            raw() {
                 try {
-                    const raw = localStorage.getItem(this.key());
-                    if (raw) {
-                        const d = JSON.parse(raw);
-                        if (d && Array.isArray(d.records)) return d.records;
+                    const s = localStorage.getItem(this.key());
+                    if (!s) return { v: 3, vehicles: [], records: [], odometer: [] };
+                    const d = JSON.parse(s);
+                    if (!d) throw new Error('empty');
+                    // 旧结构（v2）：只有 records
+                    if (Array.isArray(d.records) && !Array.isArray(d.vehicles)) {
+                        return { v: 3, vehicles: [], records: d.records, odometer: [] };
                     }
+                    return {
+                        v: 3,
+                        vehicles: Array.isArray(d.vehicles) ? d.vehicles : [],
+                        records: Array.isArray(d.records) ? d.records : [],
+                        odometer: Array.isArray(d.odometer) ? d.odometer : [],
+                    };
                 } catch (e) {
                     console.warn('本地数据读取失败', e);
+                    return { v: 3, vehicles: [], records: [], odometer: [] };
                 }
-                return [];
             },
-            saveAll(arr) {
+            saveRaw(d) {
                 try {
-                    localStorage.setItem(this.key(), JSON.stringify({ v: 2, records: arr }));
+                    localStorage.setItem(this.key(), JSON.stringify({
+                        v: 3,
+                        vehicles: d.vehicles || [],
+                        records: d.records || [],
+                        odometer: d.odometer || [],
+                    }));
                 } catch (e) {
                     console.warn('本地数据写入失败', e);
                     showToast('⚠️ 本地存储空间不足');
                 }
             },
-            visible() {
-                return this.all().filter(r => !r.deleted);
-            },
-            /** 上传成功后清除脏标记；期间又被改过的保持脏，等下一轮 */
-            markClean(sentMap) {
-                const all = this.all();
-                all.forEach(r => {
+            table(name) { return this.raw()[name] || []; },
+            saveTable(name, arr) { const d = this.raw(); d[name] = arr; this.saveRaw(d); },
+            visible(name) { return this.table(name).filter(x => !x.deleted); },
+            visibleRecords() { return this.visible('records'); },
+            visibleVehicles() { return this.visible('vehicles'); },
+            visibleOdometer() { return this.visible('odometer'); },
+
+            /** 上传成功后清除脏标记；期间又被改过的保持脏 */
+            markClean(name, sentMap) {
+                const arr = this.table(name);
+                arr.forEach(r => {
                     if (sentMap.has(r.id) && sentMap.get(r.id) === r.updatedAt) r.dirty = 0;
                 });
-                this.saveAll(all);
+                this.saveTable(name, arr);
             },
             /** 全部标记为待上传（服务端数据丢失时的自愈） */
             markAllDirty() {
-                const all = this.all();
                 const now = Date.now();
-                all.forEach(r => {
-                    r.dirty = 1;
-                    r.updatedAt = now + Math.floor(Math.random() * 1000);
+                ['vehicles', 'records', 'odometer'].forEach(name => {
+                    const arr = this.table(name);
+                    arr.forEach(r => {
+                        r.dirty = 1;
+                        r.updatedAt = now + Math.floor(Math.random() * 1000);
+                    });
+                    this.saveTable(name, arr);
                 });
-                this.saveAll(all);
             },
         };
 
+        /** 当前筛选范围内的记录（按当前车辆过滤；「全部」时返回所有） */
         function loadRecords() {
-            return DB.visible();
+            const all = DB.visibleRecords();
+            const V = window.Vehicles;
+            if (!V) return all;
+            const vid = V.currentVehicleId();
+            if (!vid) return all;
+            return all.filter(r => V.resolveVehicleId(r) === vid);
         }
 
         /**
-         * 保存可见记录列表。行为：
-         *  - 新记录 / 内容变化的记录 → 打上 updatedAt 与 dirty，等待同步
-         *  - 从列表里消失的记录 → 变成删除墓碑（否则同步时会被别的设备「复活」）
+         * 保存当前范围内的记录：
+         *  - 新增 / 内容变化 → 打时间戳与脏标记
+         *  - 范围内消失 → 删除墓碑
+         *  - 范围外的记录原样保留（切到单车时不会误删别的车的记录）
          */
         function saveRecords(list) {
-            const prev = DB.all();
-            const prevMap = new Map(prev.map(r => [r.id, r]));
+            const all = DB.table('records');
+            const map = new Map(all.map(r => [r.id, r]));
             const now = Date.now();
-            const alive = [];
+            const V = window.Vehicles;
+            const vid = V ? V.currentVehicleId() : '';
+            const resolve = V ? V.resolveVehicleId : (r => r.vehicleId || '');
+            const inScope = (r) => !vid || resolve(r) === vid;
+
             const seen = new Set();
+            const out = all.filter(r => !inScope(r));
 
             (list || []).forEach(r => {
                 if (!r || !r.id) return;
                 seen.add(r.id);
-                const p = prevMap.get(r.id);
+                const p = map.get(r.id);
                 const changed = !p ||
                     p.date !== r.date ||
                     p.type !== r.type ||
                     Number(p.amount) !== Number(r.amount) ||
                     (p.note || '') !== (r.note || '') ||
-                    !!p.usePoints !== !!r.usePoints;
-                alive.push({
+                    !!p.usePoints !== !!r.usePoints ||
+                    (r.vehicleId && p.vehicleId !== r.vehicleId);
+                out.push({
                     id: r.id,
                     date: r.date,
                     type: r.type,
                     amount: Number(r.amount) || 0,
                     note: r.note || '',
                     usePoints: !!r.usePoints,
+                    vehicleId: r.vehicleId || (p && p.vehicleId) || vid || '',
                     createTime: r.createTime || (p && p.createTime) || now,
                     updatedAt: changed ? now : (p.updatedAt || now),
                     dirty: changed ? 1 : (p.dirty || 0),
@@ -1739,25 +2079,13 @@
                 });
             });
 
-            // 原来存在、现在不见了 → 删除墓碑
-            prev.forEach(p => {
-                if (p.deleted || seen.has(p.id)) return;
-                alive.push({
-                    id: p.id,
-                    date: p.date,
-                    type: p.type,
-                    amount: Number(p.amount) || 0,
-                    note: p.note || '',
-                    usePoints: !!p.usePoints,
-                    createTime: p.createTime || now,
-                    updatedAt: now,
-                    dirty: 1,
-                    deleted: 1,
-                });
+            all.forEach(p => {
+                if (p.deleted || seen.has(p.id) || !inScope(p)) return;
+                out.push(Object.assign({}, p, { deleted: 1, updatedAt: now, dirty: 1 }));
             });
 
-            DB.saveAll(alive);
-            records = alive.filter(r => !r.deleted);
+            DB.saveTable('records', out);
+            records = loadRecords();
             if (typeof scheduleSync === 'function') scheduleSync(1200);
         }
 
@@ -2631,6 +2959,7 @@
         }
 
         function renderAll() {
+            if (window.Vehicles) window.Vehicles.renderVehicleUI();
             if (viewMode === 'monthly') {
                 renderMonthlyView();
             } else {
@@ -2821,6 +3150,7 @@
             else init();
         });
     </script>
+    <script src="./vehicles.js"></script>
     <script src="./supabase-sync.js"></script>
 
     <!-- ===== 首次使用：连接 Supabase ===== -->

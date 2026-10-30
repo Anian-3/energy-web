@@ -204,35 +204,101 @@
     }
 
     // ───────────────────────── 同步 ─────────────────────────
-    const COLS = 'id,date,type,amount,note,use_points,create_time,client_ts,deleted';
-
-    function toRow(r) {
-        return {
-            id: r.id,
-            date: r.date,
-            type: r.type,
-            amount: r.amount,
-            note: r.note || '',
-            use_points: !!r.usePoints,
-            create_time: r.createTime || 0,
-            client_ts: r.updatedAt || r.createTime || 0,
-            deleted: !!r.deleted,
-        };
-    }
-
-    function fromRow(o) {
-        return {
-            id: o.id,
-            date: o.date,
-            type: o.type,
-            amount: Number(o.amount) || 0,
-            note: o.note || '',
-            usePoints: !!o.use_points,
-            createTime: Number(o.create_time) || 0,
-            updatedAt: Number(o.client_ts) || 0,
-            deleted: o.deleted ? 1 : 0,
-        };
-    }
+    const TABLES = [
+        {
+            name: 'vehicles',
+            path: '/rest/v1/vehicles',
+            cols: 'id,name,type,note,start_odometer,created_at,client_ts,deleted',
+            toRow(v) {
+                return {
+                    id: v.id,
+                    name: v.name,
+                    type: v.type,
+                    note: v.note || '',
+                    start_odometer: Number(v.startOdometer) || 0,
+                    created_at: Number(v.createdAt) || 0,
+                    client_ts: Number(v.updatedAt) || 0,
+                    deleted: !!v.deleted,
+                };
+            },
+            fromRow(o) {
+                return {
+                    id: o.id,
+                    name: o.name,
+                    type: o.type,
+                    note: o.note || '',
+                    startOdometer: Number(o.start_odometer) || 0,
+                    createdAt: Number(o.created_at) || 0,
+                    updatedAt: Number(o.client_ts) || 0,
+                    deleted: o.deleted ? 1 : 0,
+                };
+            },
+        },
+        {
+            name: 'records',
+            path: '/rest/v1/records',
+            cols: 'id,date,type,amount,note,use_points,create_time,client_ts,deleted,vehicle_id',
+            toRow(r) {
+                return {
+                    id: r.id,
+                    date: r.date,
+                    type: r.type,
+                    amount: Number(r.amount) || 0,
+                    note: r.note || '',
+                    use_points: !!r.usePoints,
+                    create_time: Number(r.createTime) || 0,
+                    client_ts: Number(r.updatedAt) || 0,
+                    deleted: !!r.deleted,
+                    vehicle_id: r.vehicleId || null,
+                };
+            },
+            fromRow(o) {
+                return {
+                    id: o.id,
+                    date: o.date,
+                    type: o.type,
+                    amount: Number(o.amount) || 0,
+                    note: o.note || '',
+                    usePoints: !!o.use_points,
+                    createTime: Number(o.create_time) || 0,
+                    updatedAt: Number(o.client_ts) || 0,
+                    deleted: o.deleted ? 1 : 0,
+                    vehicleId: o.vehicle_id || '',
+                };
+            },
+        },
+        {
+            name: 'odometer',
+            path: '/rest/v1/odometer',
+            cols: 'id,vehicle_id,date,total_km,ev_km,note,created_at,client_ts,deleted',
+            toRow(o) {
+                return {
+                    id: o.id,
+                    vehicle_id: o.vehicleId,
+                    date: o.date,
+                    total_km: Number(o.totalKm) || 0,
+                    ev_km: o.evKm === null || o.evKm === undefined || o.evKm === '' ? null : Number(o.evKm),
+                    note: o.note || '',
+                    created_at: Number(o.createdAt) || 0,
+                    client_ts: Number(o.updatedAt) || 0,
+                    deleted: !!o.deleted,
+                };
+            },
+            fromRow(o) {
+                return {
+                    id: o.id,
+                    vehicleId: o.vehicle_id,
+                    date: o.date,
+                    totalKm: Number(o.total_km) || 0,
+                    evKm: o.ev_km === null || o.ev_km === undefined ? null : Number(o.ev_km),
+                    note: o.note || '',
+                    createdAt: Number(o.created_at) || 0,
+                    updatedAt: Number(o.client_ts) || 0,
+                    deleted: o.deleted ? 1 : 0,
+                };
+            },
+        },
+    ];
 
     function scheduleSync(delay) {
         if (!SESSION.access) return;
@@ -240,33 +306,35 @@
         syncTimer = setTimeout(() => { syncNow(); }, delay === undefined ? 1200 : delay);
     }
 
-    function applyRemote(rows) {
-        if (!rows || !rows.length) return;
-        const all = DB.all();
+    function sameRow(local, s) {
+        return Object.keys(s).every((k) => {
+            const b = s[k];
+            const a = local[k];
+            if (typeof b === 'boolean') return !!a === b;
+            if (typeof b === 'number') return Number(a) === b;
+            if (b === null) return a === null || a === undefined || a === '';
+            return String(a === null || a === undefined ? '' : a) === String(b);
+        });
+    }
+
+    function applyRemote(table, rows) {
+        if (!rows || !rows.length) return false;
+        const all = DB.table(table.name);
         const map = new Map(all.map((r) => [r.id, r]));
         let changed = false;
 
         for (const o of rows) {
-            const s = fromRow(o);
+            const s = table.fromRow(o);
             const local = map.get(s.id);
             // 本地有未上传且更新的改动 → 保留本地
             if (local && local.dirty && (local.updatedAt || 0) > (s.updatedAt || 0)) continue;
-
-            const same = local && !local.dirty && local.updatedAt === s.updatedAt &&
-                !!local.deleted === !!s.deleted && local.date === s.date &&
-                local.type === s.type && local.amount === s.amount &&
-                (local.note || '') === s.note && !!local.usePoints === s.usePoints;
-            if (same) continue;
-
-            map.set(s.id, { ...s, dirty: 0 });
+            if (local && !local.dirty && sameRow(local, s)) continue;
+            map.set(s.id, Object.assign({}, s, { dirty: 0 }));
             changed = true;
         }
 
-        if (!changed) return;
-        DB.saveAll(Array.from(map.values()));
-        records = DB.visible();
-        if (typeof renderAll === 'function') renderAll();
-        updateCount();
+        if (changed) DB.saveTable(table.name, Array.from(map.values()));
+        return changed;
     }
 
     async function syncNow(opts) {
@@ -281,23 +349,35 @@
         try {
             await ensureToken();
 
-            const dirty = DB.all().filter((r) => r.dirty);
-            if (dirty.length) {
-                const rows = dirty.map(toRow);
-                // 分批发，单次别太多
-                for (let i = 0; i < rows.length; i += 200) {
-                    await sb('/rest/v1/records?on_conflict=user_id,id', {
+            // 1) 推送所有待上传的改动（三张表）
+            for (const table of TABLES) {
+                const dirty = DB.table(table.name).filter((r) => r.dirty);
+                if (!dirty.length) continue;
+                const rows = dirty.map(table.toRow);
+                for (let k = 0; k < rows.length; k += 200) {
+                    await sb(table.path + '?on_conflict=user_id,id', {
                         method: 'POST',
-                        body: rows.slice(i, i + 200),
+                        body: rows.slice(k, k + 200),
                         prefer: 'resolution=merge-duplicates,return=minimal',
                     });
                 }
                 const sent = new Map(dirty.map((r) => [r.id, r.updatedAt]));
-                DB.markClean(sent);
+                DB.markClean(table.name, sent);
             }
 
-            const rows = await sb('/rest/v1/records?select=' + encodeURIComponent(COLS) + '&limit=20000');
-            applyRemote(rows || []);
+            // 2) 拉取三张表并合并
+            let changed = false;
+            for (const table of TABLES) {
+                const rows = await sb(table.path + '?select=' + encodeURIComponent(table.cols) + '&limit=20000');
+                if (applyRemote(table, rows || [])) changed = true;
+            }
+
+            if (window.Vehicles) {
+                window.Vehicles.ensureDefaultVehicle();
+                window.Vehicles.renderVehicleUI();
+            }
+            records = loadRecords();
+            if (changed && typeof renderAll === 'function') renderAll();
 
             lastSyncAt = Date.now();
             localStorage.setItem('sb_last_sync', String(lastSyncAt));
@@ -332,7 +412,7 @@
         const msg = '检测到本机有 ' + guest.length + ' 条旧的本地记录，是否一并上传到当前账号？';
         if (!confirm(msg)) return;
 
-        const all = DB.all();
+        const all = DB.table('records');
         const now = Date.now();
         let added = 0;
         guest.forEach((r, i) => {
@@ -342,6 +422,7 @@
                 id: r.id,
                 date: r.date,
                 type: r.type,
+                vehicleId: '',
                 amount: Number(r.amount) || 0,
                 note: r.note || '',
                 usePoints: !!r.usePoints,
@@ -354,8 +435,8 @@
         });
         if (!added) return;
 
-        DB.saveAll(all);
-        records = DB.visible();
+        DB.saveTable('records', all);
+        records = loadRecords();
         if (typeof renderAll === 'function') renderAll();
         try { localStorage.setItem('hybrid_energy_records_backup', JSON.stringify(guest)); } catch (e) {}
         localStorage.removeItem('hybrid_energy_records');
@@ -593,6 +674,7 @@
     // ───────────────────────── 启动 ─────────────────────────
     function enterApp(user) {
         currentUser = user;
+        if (window.Vehicles) window.Vehicles.ensureDefaultVehicle();
         records = loadRecords();
         lastSyncAt = Number(localStorage.getItem('sb_last_sync') || 0) || 0;
 
