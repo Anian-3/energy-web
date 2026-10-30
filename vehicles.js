@@ -341,7 +341,7 @@
         byId('vehicleFormTitle').textContent = v ? '编辑车辆' : '添加车辆';
         byId('vehName').value = v ? v.name : '';
         byId('vehStartOdo').value = v && v.startOdometer ? v.startOdometer : '';
-        setVehicleType(v ? v.type : 'hybrid');
+        setVehicleType(v ? v.type : 'fuel');
         setFillMode(v ? (v.fillMode || 'full') : 'full');
         byId('vehSubmit').textContent = v ? '保存修改' : '添加';
         byId('vehCancel').style.display = v ? '' : 'none';

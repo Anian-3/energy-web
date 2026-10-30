@@ -273,6 +273,57 @@
             box-shadow: var(--shadow);
             padding: 16px 12px 8px;
         }
+        /* 每日趋势图例：可勾选 */
+        .chart-legend {
+            display: flex;
+            justify-content: center;
+            gap: 18px;
+            margin: 2px 0 8px;
+        }
+        .chart-legend .lg-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border: none;
+            background: none;
+            padding: 3px 4px;
+            font-family: inherit;
+            font-size: 12px;
+            color: #64748b;
+            cursor: pointer;
+        }
+        .chart-legend .lg-item:not(.active) { color: #a8b3c2; }
+        .chart-legend .lg-box {
+            position: relative;
+            width: 15px;
+            height: 15px;
+            border-radius: 4px;
+            border: 1.5px solid #cbd5e1;
+            background: #fff;
+            box-sizing: border-box;
+        }
+        .chart-legend .lg-item.active[data-series="electric"] .lg-box {
+            border-color: #3b82f6;
+            background: #3b82f6;
+        }
+        .chart-legend .lg-item.active[data-series="gas"] .lg-box {
+            border-color: #f59e0b;
+            background: #f59e0b;
+        }
+        .chart-legend .lg-box::after {
+            content: '';
+            position: absolute;
+            left: 4px;
+            top: 1px;
+            width: 4px;
+            height: 8px;
+            border: solid #fff;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+            opacity: 0;
+        }
+        .chart-legend .lg-item.active .lg-box::after { opacity: 1; }
+
         .chart-card .chart-title {
             font-size: 15px;
             font-weight: 600;
@@ -1829,13 +1880,13 @@
             <button class="close-btn" id="vehClose">✕</button>
         </div>
         <div class="vehicle-list" id="vehicleList"></div>
-        <div class="vehicle-form" id="vehicleForm" data-type="hybrid">
+        <div class="vehicle-form" id="vehicleForm" data-type="fuel">
             <div class="vf-title" id="vehicleFormTitle">添加车辆</div>
             <input class="note-input" id="vehName" type="text" placeholder="名称，如：小紫" maxlength="12" />
             <div class="vtype-toggle" id="vehTypeToggle">
-                <button type="button" data-type="fuel">⛽ 燃油车</button>
+                <button type="button" data-type="fuel" class="active">⛽ 燃油车</button>
                 <button type="button" data-type="ev">⚡ 纯电车</button>
-                <button type="button" data-type="hybrid" class="active">🔋 混动车</button>
+                <button type="button" data-type="hybrid">🔋 混动车</button>
             </div>
             <div class="vf-row" id="vehFillRow">
                 <span class="vf-label">加油习惯</span>
@@ -1911,7 +1962,7 @@
                         <li>账号面板新增「⚠️ 数据检查」，可手动清理冲突记录</li>
                     </ul>
                 </li>
-                <li>调整部分 UI 与布局：里程面板间距与窄屏排列、自动提醒改为勾选框、登录页版本号入口</li>
+                <li>调整部分 UI 与布局</li>
             </ul>
 
             <h2>v1.4.1 · 2026-10-31</h2>
@@ -2217,6 +2268,14 @@
     <div class="chart-card" id="chartCard">
         <div class="chart-title" id="chartTitle">
             <span>📈 每日花费趋势</span>
+        </div>
+        <div class="chart-legend" id="trendLegend">
+            <button type="button" class="lg-item active" data-series="electric">
+                <span class="lg-box"></span><span>充电（¥）</span>
+            </button>
+            <button type="button" class="lg-item active" data-series="gas">
+                <span class="lg-box"></span><span>加油（¥）</span>
+            </button>
         </div>
         <div class="chart-wrapper" id="chartWrapper">
             <canvas id="trendChart"></canvas>
@@ -2543,6 +2602,16 @@
         const typeToggle = $('#typeToggle');
         const toast = $('#toast');
         const chartCanvas = $('#trendChart');
+        const trendLegend = $('#trendLegend');
+        // 每日趋势默认两条都显示
+        const trendVisible = { electric: true, gas: true };
+
+        function renderTrendLegend() {
+            if (!trendLegend) return;
+            trendLegend.querySelectorAll('.lg-item').forEach((btn) => {
+                btn.classList.toggle('active', !!trendVisible[btn.dataset.series]);
+            });
+        }
         const chartEmpty = $('#chartEmpty');
         const chartTitle = $('#chartTitle');
 
@@ -3340,51 +3409,70 @@
                 chartInstance = null;
             }
 
-            if (!hasData) {
+            const isBar = chartType === 'bar';
+
+            // 每日趋势用页面上的勾选图例；年度柱状图仍用画布内图例
+            if (trendLegend) trendLegend.style.display = isBar ? 'none' : '';
+            if (!isBar) renderTrendLegend();
+
+            const showEv = isBar ? true : trendVisible.electric;
+            const showGas = isBar ? true : trendVisible.gas;
+
+            if (!hasData || (!showEv && !showGas)) {
                 chartCanvas.style.display = 'none';
                 chartEmpty.style.display = 'block';
+                chartEmpty.textContent = hasData
+                    ? '两条曲线都已隐藏，勾选上方图例即可恢复'
+                    : '暂无数据，添加记录后趋势图将自动生成';
                 return;
             }
 
             chartCanvas.style.display = 'block';
             chartEmpty.style.display = 'none';
+            chartEmpty.textContent = '暂无数据，添加记录后趋势图将自动生成';
 
-            const isBar = chartType === 'bar';
+            const datasets = [];
+            if (showEv) {
+                datasets.push({
+                    label: '充电 (¥)',
+                    data: electricData,
+                    borderColor: '#3b82f6',
+                    backgroundColor: isBar ? 'rgba(59, 130, 246, 0.7)' : 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.2,
+                    pointRadius: isBar ? 0 : 2,
+                    pointBackgroundColor: '#3b82f6',
+                    fill: !isBar,
+                    borderWidth: isBar ? 1 : 2,
+                    borderRadius: isBar ? 2 : 0,
+                });
+            }
+            if (showGas) {
+                datasets.push({
+                    label: '加油 (¥)',
+                    data: gasData,
+                    borderColor: '#f59e0b',
+                    backgroundColor: isBar ? 'rgba(245, 158, 11, 0.7)' : 'rgba(245, 158, 11, 0.1)',
+                    tension: 0.2,
+                    pointRadius: isBar ? 0 : 2,
+                    pointBackgroundColor: '#f59e0b',
+                    fill: !isBar,
+                    borderWidth: isBar ? 1 : 2,
+                    borderRadius: isBar ? 2 : 0,
+                });
+            }
 
             chartInstance = new Chart(ctx, {
                 type: chartType,
                 data: {
                     labels: labels,
-                    datasets: [{
-                        label: '充电 (¥)',
-                        data: electricData,
-                        borderColor: '#3b82f6',
-                        backgroundColor: isBar ? 'rgba(59, 130, 246, 0.7)' : 'rgba(59, 130, 246, 0.1)',
-                        tension: 0.2,
-                        pointRadius: isBar ? 0 : 2,
-                        pointBackgroundColor: '#3b82f6',
-                        fill: !isBar,
-                        borderWidth: isBar ? 1 : 2,
-                        borderRadius: isBar ? 2 : 0,
-                    }, {
-                        label: '加油 (¥)',
-                        data: gasData,
-                        borderColor: '#f59e0b',
-                        backgroundColor: isBar ? 'rgba(245, 158, 11, 0.7)' : 'rgba(245, 158, 11, 0.1)',
-                        tension: 0.2,
-                        pointRadius: isBar ? 0 : 2,
-                        pointBackgroundColor: '#f59e0b',
-                        fill: !isBar,
-                        borderWidth: isBar ? 1 : 2,
-                        borderRadius: isBar ? 2 : 0,
-                    }]
+                    datasets: datasets
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
                         legend: {
-                            display: true,
+                            display: isBar,
                             position: 'top',
                             labels: {
                                 boxWidth: 12,
@@ -3807,6 +3895,17 @@
             });
             const c = document.getElementById('changelogClose');
             if (c) c.addEventListener('click', close);
+        }
+
+        if (trendLegend) {
+            trendLegend.addEventListener('click', (e) => {
+                const btn = e.target.closest('.lg-item');
+                if (!btn) return;
+                const key = btn.dataset.series;
+                trendVisible[key] = !trendVisible[key];
+                renderTrendLegend();
+                renderMonthlyChart();
+            });
         }
 
         document.addEventListener('DOMContentLoaded', function () {
