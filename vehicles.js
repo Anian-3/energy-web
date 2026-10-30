@@ -60,8 +60,39 @@
         .vehicle-form .vf-row { margin: 10px 0 4px; }
         .vehicle-form .vf-label { font-size: 12.5px; color: var(--text-secondary); font-weight: 600; }
         .vehicle-form .vf-hint { font-size: 11px; color: #94a3b8; line-height: 1.5; margin-bottom: 8px; }
-        .mileage-form .split-row { display: flex; gap: 8px; }
+        .mileage-form .split-row { display: flex; gap: 8px; align-items: stretch; }
         .mileage-form .split-row input { flex: 1 1 0; min-width: 0; }
+        /* 窄屏：两个里程框上下排列，避免挤在一起、提示文字压到框上 */
+        @media (max-width: 430px) {
+            .mileage-form .split-row { flex-direction: column; gap: 6px; }
+        }
+        .mileage-form .hint {
+            display: block;
+            margin: 6px 0 0;
+            font-size: 11.5px;
+            line-height: 1.55;
+            color: #94a3b8;
+        }
+        .mileage-form .auto-odo-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            margin: 6px 0 0;
+            font-size: 12.5px;
+            color: #64748b;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .mileage-form .auto-odo-row input[type="checkbox"] {
+            width: 17px;
+            height: 17px;
+            margin: 0;
+            accent-color: #6366f1;
+            cursor: pointer;
+            flex: 0 0 auto;
+        }
     `;
 
     (function injectStyles() {
@@ -133,9 +164,9 @@
     }
 
     function paintAutoOdo() {
-        const link = byId('odoAutoToggle');
-        if (!link) return;
-        link.textContent = autoOdoEnabled() ? '以后不再自动弹出' : '已关闭自动弹出，点此重新开启';
+        const box = byId('odoAutoToggle');
+        if (!box) return;
+        box.checked = autoOdoEnabled();
     }
 
     function setAutoOdo(on) {
@@ -931,11 +962,12 @@
 
         const autoToggle = byId('odoAutoToggle');
         if (autoToggle) {
-            autoToggle.addEventListener('click', (e) => {
-                e.preventDefault();
-                const next = !autoOdoEnabled();
-                setAutoOdo(next);
-                toast(next ? '已开启：记账后自动提醒记里程' : '已关闭：记账后不再自动弹出', 2200);
+            autoToggle.addEventListener('change', () => {
+                setAutoOdo(!!autoToggle.checked);
+                toast(
+                    autoToggle.checked ? '已开启：记账后自动提醒记里程' : '已关闭：记账后不再自动弹出',
+                    2200
+                );
             });
         }
 
