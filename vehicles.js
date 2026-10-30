@@ -446,15 +446,47 @@
 
     /**
      * 计算某辆车在一段日期内的里程与花费
-     * @returns {object} { ok, km, total, electric, gas, perKm, evPerKm, fuelPerKm, note }
+     * 口径：
+     *   分母 = 结束读数 − 起始读数（起始读数取「区间开始之前的最后一条」）
+     *   分子 = 起始读数那一天起、到区间结束的金额合计
+     * 这样分子分母覆盖的是同一段时间，不会出现「全部历史金额 ÷ 最近几个月里程」的错配。
      */
     function calcRange(vehicleId, from, to) {
         const v = vehicleById(vehicleId);
-        const out = { ok: false, km: 0, total: 0, electric: 0, gas: 0, perKm: null, evPerKm: null, fuelPerKm: null, note: '' };
+        const out = {
+            ok: false, km: 0, total: 0, electric: 0, gas: 0,
+            perKm: null, evPerKm: null, fuelPerKm: null, note: '',
+            fromDate: '', fromKm: null, toDate: '', toKm: null, spendFrom: '',
+        };
         if (!v) return out;
 
+        const readings = odometerOf(vehicleId);
+        if (!readings.length) { out.note = '还没有里程记录'; return out; }
+
+        let base = null;
+        if (from) {
+            const before = readings.filter((o) => o.date <= from);
+            base = before.length ? before[before.length - 1] : null;
+            if (!base) {
+                const inRange = readings.filter((o) => o.date >= from && (!to || o.date <= to));
+                base = inRange.length ? inRange[0] : null;
+            }
+        } else {
+            base = readings[0];
+        }
+
+        const upto = to ? readings.filter((o) => o.date <= to) : readings;
+        const last = upto.length ? upto[upto.length - 1] : null;
+
+        if (!base || !last) { out.note = '缺少里程数据'; return out; }
+        if (base.id === last.id) { out.note = '区间内只有一条里程记录，再记一次才能算'; return out; }
+
+        const km = Number(last.totalKm) - Number(base.totalKm);
+        if (!(km > 0)) { out.note = '里程没有增加，无法计算'; return out; }
+
+        const spendFrom = from || base.date;
         const recs = DB.visibleRecords().filter(
-            (r) => resolveVehicleId(r) === vehicleId && (!from || r.date >= from) && (!to || r.date <= to)
+            (r) => resolveVehicleId(r) === vehicleId && r.date >= spendFrom && (!to || r.date <= to)
         );
         recs.forEach((r) => {
             const a = Number(r.amount) || 0;
@@ -463,65 +495,23 @@
             else if (r.type === 'gas') out.gas += a;
         });
 
-        const readings = odometerOf(vehicleId);
-        const inOrBefore = (d) => readings.filter((o) => o.date <= d);
-
-        // 区间起点读数：区间内/之前最后一个
-        const beforeList = inOrBefore(from || '0000-00-00');
-        const lastList = inOrBefore(to || '9999-99-99');
-
-        let base = beforeList.length ? beforeList[beforeList.length - 1] : null;
-        let baseKm = null;
-        let baseEv = null;
-        let baseFromStartOdo = false;
-
-        if (!base && v.startOdometer > 0) {
-            baseKm = Number(v.startOdometer);
-            baseFromStartOdo = true;
-        } else if (base) {
-            baseKm = Number(base.totalKm);
-            baseEv = base.evKm != null ? Number(base.evKm) : null;
-        }
-
-        const last = lastList.length ? lastList[lastList.length - 1] : null;
-        if (last && baseKm == null) {
-            // 没有任何基线：用区间内第一条读数当基线（会略微高估每公里）
-            const firstInRange = readings.find((o) => (!from || o.date >= from) && (!to || o.date <= to));
-            if (firstInRange && firstInRange.id === last.id) {
-                out.note = '只有一条里程记录，无法计算';
-                return out;
-            }
-            if (firstInRange) {
-                baseKm = Number(firstInRange.totalKm);
-                baseEv = firstInRange.evKm != null ? Number(firstInRange.evKm) : null;
-                out.note = '里程起点取自区间内第一条记录，结果偏保守';
-            }
-        }
-
-        if (!last || baseKm == null) {
-            out.note = last ? '' : '还没有里程记录';
-            return out;
-        }
-
-        const km = Number(last.totalKm) - baseKm;
-        if (!(km > 0)) {
-            out.note = baseFromStartOdo ? '请记录一次当前里程' : '里程没有增加，无法计算';
-            return out;
-        }
-
-        out.km = km;
         out.ok = true;
+        out.km = km;
         out.perKm = out.total / km;
+        out.fromDate = base.date;
+        out.fromKm = Number(base.totalKm);
+        out.toDate = last.date;
+        out.toKm = Number(last.totalKm);
+        out.spendFrom = spendFrom;
 
         if (v.type === 'hybrid') {
-            const lastEv = last.evKm != null ? Number(last.evKm) : null;
-            if (lastEv != null && baseEv != null) {
-                const evKm = lastEv - baseEv;
+            const bEv = base.evKm != null ? Number(base.evKm) : null;
+            const lEv = last.evKm != null ? Number(last.evKm) : null;
+            if (bEv != null && lEv != null) {
+                const evKm = lEv - bEv;
                 const fuelKm = km - evKm;
                 if (evKm > 0) out.evPerKm = out.electric / evKm;
                 if (fuelKm > 0) out.fuelPerKm = out.gas / fuelKm;
-            } else {
-                out.note = out.note || '混动车型填了纯电里程才能分用电/用油';
             }
         }
         return out;
@@ -561,30 +551,44 @@
         const m = typeof currentMonth === 'number' ? currentMonth : new Date().getMonth();
         const mr = monthRange(y, m);
 
-        const month = calcRange(v.id, mr.from, mr.to);
-        const total = calcRange(v.id, '', '');
+        const monthR = calcRange(v.id, mr.from, mr.to);
+        const totalR = calcRange(v.id, '', '');
 
-        byId('pkMonth').textContent = month.ok ? fmtMoney(month.perKm) : '—';
-        byId('pkTotal').textContent = total.ok ? fmtMoney(total.perKm) : '—';
+        byId('pkMonth').textContent = monthR.ok ? fmtMoney(monthR.perKm) : '—';
+        byId('pkTotal').textContent = totalR.ok ? fmtMoney(totalR.perKm) : '—';
 
         const split = byId('pkSplit');
-        if (v.type === 'hybrid' && month.ok && (month.evPerKm != null || month.fuelPerKm != null)) {
+        if (v.type === 'hybrid' && monthR.ok && (monthR.evPerKm != null || monthR.fuelPerKm != null)) {
             split.style.display = '';
-            byId('pkEv').textContent = month.evPerKm != null ? fmtMoney(month.evPerKm) : '—';
-            byId('pkFuel').textContent = month.fuelPerKm != null ? fmtMoney(month.fuelPerKm) : '—';
+            byId('pkEv').textContent = monthR.evPerKm != null ? fmtMoney(monthR.evPerKm) : '—';
+            byId('pkFuel').textContent = monthR.fuelPerKm != null ? fmtMoney(monthR.fuelPerKm) : '—';
         } else {
             split.style.display = 'none';
         }
 
-        const readings = odometerOf(v.id);
-        const lastOdo = readings.length ? readings[readings.length - 1] : null;
-        const foot = byId('pkFoot');
-        if (!lastOdo) {
-            foot.textContent = '还没有里程记录，点右侧「记里程」开始';
-        } else {
-            const kmText = month.ok ? `本月跑了 ${month.km} km` : (month.note || '本月里程不足');
-            foot.textContent = `上次读数 ${lastOdo.totalKm} km（${lastOdo.date}）· ${kmText}`;
+        // 把分子 / 分母 / 读数区间全部摊开，避免"数字对不上"
+        const lines = [];
+        if (totalR.ok) {
+            lines.push(
+                '累计 ' + fmtMoney(totalR.total) + ' ÷ ' + totalR.km + ' km = ' + fmtMoney(totalR.perKm) +
+                '（读数 ' + totalR.fromKm + ' → ' + totalR.toKm + '，' + totalR.spendFrom + ' 起）'
+            );
+        } else if (totalR.note) {
+            lines.push('累计：' + totalR.note);
         }
+        if (monthR.ok) {
+            lines.push(
+                '本月 ' + fmtMoney(monthR.total) + ' ÷ ' + monthR.km + ' km = ' + fmtMoney(monthR.perKm) +
+                '（读数 ' + monthR.fromKm + ' → ' + monthR.toKm + '）'
+            );
+        } else if (monthR.note) {
+            lines.push('本月：' + monthR.note);
+        }
+
+        const foot = byId('pkFoot');
+        foot.innerHTML = lines.map(escapeHtml).join('<br />');
+        foot.style.lineHeight = '1.75';
+        foot.style.fontSize = '11px';
     }
 
     // ───────────────────────── 渲染入口 ─────────────────────────
@@ -608,6 +612,10 @@
 
     // ───────────────────────── 事件绑定 ─────────────────────────
     function bind() {
+        // 「初始里程」已不参与计算（避免口径歧义），隐藏掉
+        const soInput = byId('vehStartOdo');
+        if (soInput) soInput.style.display = 'none';
+
         const addBtn = byId('vehicleAddBtn');
         if (addBtn) addBtn.addEventListener('click', () => openVehicleSheet());
 
