@@ -1748,7 +1748,49 @@
         }
         .mileage-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
         .mileage-form .amount-input, .mileage-form .note-input { width: 100%; }
-        .mileage-form .hint { font-size: 11.5px; color: #94a3b8; margin-top: -2px; }
+        /* 纯电 / 燃油两个框：窄屏上下排，宽屏并排 */
+        .mileage-form .split-row { display: flex; gap: 8px; align-items: stretch; }
+        .mileage-form .split-row .amount-input { flex: 1 1 0; min-width: 0; }
+        @media (max-width: 430px) {
+            .mileage-form .split-row { flex-direction: column; gap: 6px; }
+        }
+        /* 提示文字单独一行，与输入框拉开距离 */
+        .mileage-form .hint {
+            display: block;
+            margin: 10px 0 0;
+            font-size: 11.5px;
+            line-height: 1.55;
+            color: #94a3b8;
+        }
+        /* 「记完一笔自动提醒填里程」勾选框 */
+        .mileage-form .auto-odo-row {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            margin: 4px 0 0;
+            font-size: 12.5px;
+            color: #64748b;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .mileage-form .auto-odo-row > span { white-space: nowrap; }
+        .mileage-form .auto-odo-row > input[type="checkbox"] {
+            flex: 0 0 auto;
+            width: 17px;
+            min-width: 17px;
+            max-width: 17px;
+            height: 17px;
+            margin: 0;
+            padding: 0;
+            border: none;
+            background: none;
+            accent-color: #6366f1;
+            cursor: pointer;
+        }
         .mileage-list { max-height: 34vh; overflow-y: auto; }
         .orow {
             display: flex;
