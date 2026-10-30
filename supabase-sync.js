@@ -864,6 +864,8 @@
     }
 
     window.__boot = boot;
+    // 供其他脚本关闭账号面板（这个文件包在 IIFE 里，外部拿不到）
+    window.__closeAccount = closeAccount;
     window.scheduleSync = scheduleSync;
     window.SyncNow = syncNow;
 })();

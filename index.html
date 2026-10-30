@@ -949,6 +949,41 @@
         }
 
         /* ===== 页脚版本号 ===== */
+        /* 选车面板 */
+        .pick-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 4px 0 14px;
+        }
+        .pick-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            padding: 13px 14px;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            background: #fff;
+            font-family: inherit;
+            font-size: 14px;
+            color: #1e293b;
+            text-align: left;
+            cursor: pointer;
+        }
+        .pick-item:active { background: #f8fafc; }
+        .pick-item .pi-icon { font-size: 18px; }
+        .pick-item .pi-name { font-weight: 600; }
+        .pick-item .pi-sub { margin-left: auto; font-size: 12px; color: #94a3b8; }
+
+        /* 选车面板要浮在记账面板之上 */
+        #pickOverlay { z-index: 120; }
+        #pickSheet { z-index: 121; }
+
+        /* 数据检查浮在账号面板之上 */
+        #conflictOverlay { z-index: 160; }
+        #conflictSheet { z-index: 161; }
+
         .acct-item.acct-warn { cursor: pointer; }
         .acct-item.acct-warn .v { color: #b45309; font-weight: 600; }
 
@@ -1904,6 +1939,17 @@
         </div>
     </div>
 
+    <!-- ===== 选择车辆（全部视图记账） ===== -->
+    <div class="overlay" id="pickOverlay"></div>
+    <div class="bottom-sheet" id="pickSheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+            <span class="date-title" id="pickTitle">这笔记录记到哪辆车？</span>
+            <button class="close-btn" id="pickClose">✕</button>
+        </div>
+        <div class="pick-list" id="pickList"></div>
+    </div>
+
     <!-- ===== 数据检查（类型冲突） ===== -->
     <div class="overlay" id="conflictOverlay"></div>
     <div class="bottom-sheet" id="conflictSheet">
@@ -1952,6 +1998,14 @@
             <button class="guide-close" id="changelogClose" title="关闭">✕</button>
         </div>
         <div class="guide-body" id="changelogBody">
+            <h2>v1.4.3 · 2026-10-31</h2>
+            <ul>
+                <li>修复：导出的 Excel 文件名只到「日」，同一天导出多次会重名（浏览器自动加 (1)(2)，难以分辨新旧）。现在文件名带日期和时间，精确到秒，例如「油电记录_2026-10-31_145230.xlsx」</li>
+                <li>修复：在「全部」视图下记账时，如果有多辆车都能记这种类型（比如两台燃油车，或一台燃油车加一台混动车），记录会被随便挂到其中一辆。现在会弹出选择框，让你指定这笔账记到哪辆车；只有一辆可选时自动挂过去，不打扰</li>
+                <li>修复：账号面板里的「⚠️ 数据检查」点开后，弹层被账号面板挡在下面看不见。已调整层级，现在会正常浮在最上层</li>
+                <li>UI 微调</li>
+            </ul>
+
             <h2>v1.4.2 · 2026-10-31</h2>
             <ul>
                 <li>修复：燃油车 / 纯电车下仍能记错类型的问题（例如燃油车记出充电）
@@ -2361,7 +2415,7 @@
         // ================================================================
         // 旧版本用过的键名，登录后可作为「旧数据」导入
         // 应用版本号：升级时只改这一处
-        const APP_VERSION = 'v1.4.2';
+        const APP_VERSION = 'v1.4.3';
 
         const LEGACY_KEY = 'hybrid_energy_records';
 
@@ -2728,7 +2782,7 @@
             return years.map(y => ({ year: y, ...calcYearSummary(y) }));
         }
 
-        function addRecord(date, type, amount, note, usePoints) {
+        function addRecord(date, type, amount, note, usePoints, vehicleId) {
             if (!date || !type || amount == null || amount <= 0) {
                 showToast('请填写有效的金额');
                 return false;
@@ -2742,6 +2796,7 @@
                 createTime: Date.now(),
                 usePoints: !!usePoints
             };
+            if (vehicleId) record.vehicleId = vehicleId;
             records.push(record);
             saveRecords(records);
             return true;
@@ -2873,7 +2928,12 @@
                 XLSX.utils.book_append_sheet(wb, ws3, '车辆');
             }
 
-            const fileName = '油电记录_' + new Date().toISOString().slice(0, 10) + '.xlsx';
+            // 文件名精确到秒，避免同一天多次导出重名
+            const pad2 = (n) => String(n).padStart(2, '0');
+            const nowD = new Date();
+            const stamp = nowD.getFullYear() + '-' + pad2(nowD.getMonth() + 1) + '-' + pad2(nowD.getDate()) +
+                '_' + pad2(nowD.getHours()) + pad2(nowD.getMinutes()) + pad2(nowD.getSeconds());
+            const fileName = '油电记录_' + stamp + '.xlsx';
             XLSX.writeFile(wb, fileName);
             showToast('✅ 已导出 ' + recRows.length + ' 条记录、' + odoRows.length + ' 条里程', 2200);
         }
@@ -3727,34 +3787,97 @@
             const note = inputNote.value.trim();
             const usePoints = document.getElementById('usePoints').checked;
 
-            // 车型校验：燃油车不能记充电、纯电车不能记加油
-            const curV = window.Vehicles && window.Vehicles.currentVehicle ? window.Vehicles.currentVehicle() : null;
-            if (curV && window.Vehicles.allowedKinds) {
-                const kinds = window.Vehicles.allowedKinds(curV.type);
-                if (kinds.indexOf(currentType) < 0) {
-                    const what = currentType === 'electric' ? '充电' : '加油';
-                    showToast('「' + curV.name + '」是' + window.Vehicles.typeLabel(curV.type) + '，不能记' + what, 2600);
-                    if (typeof updateTypeToggle === 'function') updateTypeToggle(kinds[0]);
+            const V = window.Vehicles;
+            const what = currentType === 'electric' ? '充电' : '加油';
+            const curV = V && V.currentVehicle ? V.currentVehicle() : null;
+
+            if (V && V.allowedKinds) {
+                if (curV) {
+                    // 已选中具体车辆：类型必须匹配
+                    const kinds = V.allowedKinds(curV.type);
+                    if (kinds.indexOf(currentType) < 0) {
+                        showToast('「' + curV.name + '」是' + V.typeLabel(curV.type) + '，不能记' + what, 2600);
+                        if (typeof updateTypeToggle === 'function') updateTypeToggle(kinds[0]);
+                        return;
+                    }
+                    commitRecord(date, currentType, amount, note, usePoints, curV.id);
+                    return;
+                }
+
+                // 「全部车辆」视图：挑一辆能记这类账的车
+                const cands = V.candidatesFor ? V.candidatesFor(currentType) : [];
+                if (cands.length === 1) {
+                    commitRecord(date, currentType, amount, note, usePoints, cands[0].id);
+                    return;
+                }
+                if (cands.length > 1) {
+                    openVehiclePick(date, currentType, amount, note, usePoints, cands);
+                    return;
+                }
+                if (V.vehicles && V.vehicles().length) {
+                    showToast('没有可以记' + what + '的车，请先添加对应的车辆', 2800);
                     return;
                 }
             }
 
-            if (addRecord(date, currentType, amount, note, usePoints)) {
-                showToast(`✅ 已记录 ${currentType === 'electric' ? '充电' : '加油'} ${formatAmount(amount)}${usePoints ? ' 🎫积分' : ''}`);
-                renderAll();
-                if (sheetOpen && selectedDate === date) {
-                    renderSheet(date);
-                }
-                inputAmount.value = '';
-                inputNote.value = '';
-                document.getElementById('usePoints').checked = false;
-                inputAmount.focus();
+            commitRecord(date, currentType, amount, note, usePoints, '');
+        }
 
-                // 记完一笔，顺手引导记里程（可在里程面板里关掉）
-                if (window.Vehicles && typeof window.Vehicles.afterAddRecord === 'function') {
-                    window.Vehicles.afterAddRecord(date);
-                }
+        /** 真正写入一笔记录（选定车辆后调用） */
+        function commitRecord(date, type, amount, note, usePoints, vehicleId) {
+            if (!addRecord(date, type, amount, note, usePoints, vehicleId)) return;
+            showToast(`✅ 已记录 ${type === 'electric' ? '充电' : '加油'} ${formatAmount(amount)}${usePoints ? ' 🎫积分' : ''}`);
+            renderAll();
+            if (sheetOpen && selectedDate === date) {
+                renderSheet(date);
             }
+            inputAmount.value = '';
+            inputNote.value = '';
+            document.getElementById('usePoints').checked = false;
+            inputAmount.focus();
+
+            // 记完一笔，顺手引导记里程（可在里程面板里关掉）
+            if (window.Vehicles && typeof window.Vehicles.afterAddRecord === 'function') {
+                window.Vehicles.afterAddRecord(date);
+            }
+        }
+
+        // ── 「全部车辆」下记账时选择车辆 ──
+        let pendingRecord = null;
+
+        function openVehiclePick(date, type, amount, note, usePoints, cands) {
+            pendingRecord = { date, type, amount, note, usePoints };
+            const kind = type === 'electric' ? '充电' : '加油';
+            const title = document.getElementById('pickTitle');
+            if (title) title.textContent = '这笔' + kind + '记到哪辆车？';
+            const list = document.getElementById('pickList');
+            if (!list) return;
+            list.innerHTML = cands.map((v) => {
+                const meta = (window.Vehicles.TYPES && window.Vehicles.TYPES[v.type]) || { icon: '🚗', label: '' };
+                return '<button type="button" class="pick-item" data-id="' + v.id + '">' +
+                    '<span class="pi-icon">' + meta.icon + '</span>' +
+                    '<span class="pi-name">' + v.name + '</span>' +
+                    '<span class="pi-sub">' + meta.label + '</span>' +
+                    '</button>';
+            }).join('');
+            list.querySelectorAll('.pick-item').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const p = pendingRecord;
+                    pendingRecord = null;
+                    closeVehiclePick();
+                    if (p) commitRecord(p.date, p.type, p.amount, p.note, p.usePoints, btn.dataset.id);
+                });
+            });
+            document.getElementById('pickOverlay').classList.add('active');
+            document.getElementById('pickSheet').classList.add('active');
+        }
+
+        function closeVehiclePick() {
+            pendingRecord = null;
+            const ov = document.getElementById('pickOverlay');
+            const sh = document.getElementById('pickSheet');
+            if (ov) ov.classList.remove('active');
+            if (sh) sh.classList.remove('active');
         }
 
         // ================================================================
@@ -3896,6 +4019,11 @@
             const c = document.getElementById('changelogClose');
             if (c) c.addEventListener('click', close);
         }
+
+        const pickCloseBtn = document.getElementById('pickClose');
+        if (pickCloseBtn) pickCloseBtn.addEventListener('click', closeVehiclePick);
+        const pickOv = document.getElementById('pickOverlay');
+        if (pickOv) pickOv.addEventListener('click', closeVehiclePick);
 
         if (trendLegend) {
             trendLegend.addEventListener('click', (e) => {

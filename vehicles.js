@@ -114,6 +114,11 @@
         return list[0].id;
     }
 
+    /** 能记这类账的车（用于「全部」视图下选择归属） */
+    function candidatesFor(kind) {
+        return vehicles().filter((v) => (TYPES[v.type] || TYPES.hybrid).kinds.indexOf(kind) >= 0);
+    }
+
     /** 某车型允许的记账类型 */
     function allowedKinds(type) {
         return (TYPES[type] || TYPES.hybrid).kinds;
@@ -1079,7 +1084,7 @@
         const acctConflictRow = byId('acctConflictRow');
         if (acctConflictRow) {
             acctConflictRow.addEventListener('click', () => {
-                if (typeof closeAccount === 'function') closeAccount();
+                if (typeof window.__closeAccount === 'function') window.__closeAccount();
                 openConflictSheet();
             });
         }
@@ -1109,6 +1114,7 @@
         renderPerKm,
         applyTypeConstraints,
         allowedKinds,
+        candidatesFor,
         typeLabel,
         conflicts,
         refreshConflictUI,
