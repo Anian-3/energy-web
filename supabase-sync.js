@@ -677,6 +677,16 @@
     // ───────────────────────── 启动 ─────────────────────────
     function enterApp(user) {
         currentUser = user;
+        // 账号名可以被重复注册（uuid 会变），所以先确认这批本地数据归属谁
+        const state = DB.claim(user.id);
+        if (state === 'foreign') {
+            showOwnershipPrompt(user);
+            return;
+        }
+        finishEnterApp(user);
+    }
+
+    function finishEnterApp(user) {
         if (window.Vehicles) window.Vehicles.ensureDefaultVehicle();
         records = loadRecords();
         lastSyncAt = Number(localStorage.getItem('sb_last_sync') || 0) || 0;
@@ -694,6 +704,58 @@
         renderAccountPanel();
         scheduleSync(150);
         setTimeout(migrateGuestData, 700);
+    }
+
+    /**
+     * 本机数据的归属和当前账号对不上时，让用户决定：
+     *   迁移 → 认领给当前账号，并全部标记为待上传
+     *   归档 → 原数据另存到本机另一个键，当前账号从空白开始
+     */
+    function showOwnershipPrompt(user) {
+        const s = DB.summary();
+        const when = s.lastModified ? new Date(s.lastModified).toLocaleString() : '未知';
+        const names = s.vehicleNames.length
+            ? '（' + s.vehicleNames.join('、') + (s.vehicles > s.vehicleNames.length ? ' 等' : '') + '）'
+            : '';
+
+        const wrap = document.createElement('div');
+        wrap.className = 'login-screen';
+        wrap.id = 'ownerPrompt';
+        wrap.innerHTML =
+            '<div class="login-card">' +
+            '<div class="login-logo">📦</div>' +
+            '<div class="login-title">本机有一批旧数据</div>' +
+            '<div class="login-sub">请确认它是不是属于当前登录的账号</div>' +
+            '<div style="background:#f8fafc;border-radius:14px;padding:14px;font-size:13px;line-height:2;color:#334155;margin-bottom:16px">' +
+            '记录 <b>' + s.records + '</b> 条 · 里程 <b>' + s.odometer + '</b> 条 · 车辆 <b>' + s.vehicles + '</b> 辆' + names + '<br />' +
+            '最后修改：' + when + '<br />' +
+            '原归属：<span style="color:#b45309">另一个同名账号（或无法确认）</span>' +
+            '</div>' +
+            '<button class="login-submit" id="ownerAdopt" style="margin-bottom:10px">迁移到当前账号</button>' +
+            '<button class="ghost-btn" id="ownerArchive" style="width:100%">不是我的，归档后清空</button>' +
+            '<div class="login-foot">' +
+            '迁移：把这批数据认领给当前账号并上传到云端<br />' +
+            '归档：先把数据另存到本机，再从当前账号里清空' +
+            '</div>' +
+            '</div>';
+        document.body.appendChild(wrap);
+
+        byId('ownerAdopt').addEventListener('click', () => {
+            DB.adopt(user.id);
+            DB.markAllDirty();
+            wrap.remove();
+            finishEnterApp(user);
+            scheduleSync(300);
+            toast('已迁移到当前账号，正在上传…', 2600);
+        });
+
+        byId('ownerArchive').addEventListener('click', () => {
+            const key = DB.archive(user.id);
+            wrap.remove();
+            finishEnterApp(user);
+            toast('旧数据已归档，当前账号从空白开始', 2600);
+            console.log('[owner] 旧数据归档到', key);
+        });
     }
 
     function boot() {

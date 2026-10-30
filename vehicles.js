@@ -105,8 +105,33 @@
         return list.length ? list[0].id : '';
     }
 
+    /** 记住「上次选中的车」，刷新后不跳回「全部」 */
+    function vehicleKey() {
+        return (typeof DB !== 'undefined' ? DB.key() : 'guest') + '_veh';
+    }
+
+    function saveSelection() {
+        try {
+            localStorage.setItem(vehicleKey(), currentVehicleId || '');
+        } catch (e) { /* 忽略 */ }
+    }
+
+    function restoreSelection() {
+        let saved = '';
+        try {
+            saved = localStorage.getItem(vehicleKey()) || '';
+        } catch (e) { /* 忽略 */ }
+        const list = vehicles();
+        if (saved && list.some((v) => v.id === saved)) {
+            currentVehicleId = saved;
+            return;
+        }
+        currentVehicleId = list.length === 1 ? list[0].id : '';
+    }
+
     /** 首次进入且一辆车都没有时，建一辆默认车（id 与服务端迁移脚本保持一致，不会重复） */
     function ensureDefaultVehicle() {
+        restoreSelection();
         if (DB.visible('vehicles').length) {
             if (!currentVehicleId && vehicles().length === 1) currentVehicleId = vehicles()[0].id;
             return;
@@ -137,6 +162,7 @@
     // ───────────────────────── 车辆切换 ─────────────────────────
     function setCurrentVehicle(id) {
         currentVehicleId = id;
+        saveSelection();
         if (typeof records !== 'undefined') records = loadRecords();
         applyTypeConstraints();
         if (typeof renderAll === 'function') renderAll();
@@ -286,6 +312,7 @@
                 createdAt: now, updatedAt: now, dirty: 1, deleted: 0,
             });
             currentVehicleId = id;
+            saveSelection();
             toast('已添加「' + name + '」');
         }
 
@@ -327,7 +354,10 @@
         });
         DB.saveTable('odometer', odos);
 
-        if (currentVehicleId === id) currentVehicleId = '';
+        if (currentVehicleId === id) {
+            currentVehicleId = '';
+            saveSelection();
+        }
         records = loadRecords();
         renderVehicleList();
         fillVehicleForm();

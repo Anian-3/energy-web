@@ -1784,7 +1784,7 @@
                 <button class="excel-btn acct-btn" id="acctBtn" title="账号与同步"><span class="sync-dot" id="syncDot"></span>👤</button>
                 <button class="excel-btn" id="exportExcelBtn" title="导出Excel">📤<span class="btn-label">导出</span></button>
                 <button class="excel-btn" id="importExcelBtn" title="导入Excel">📥<span class="btn-label">导入</span></button>
-                <button id="clearAllBtn" title="清除所有数据">🗑</button>
+                <button id="clearAllBtn" title="清空记录与里程（车辆保留）">🗑</button>
             </div>
         </div>
 
@@ -1994,28 +1994,30 @@
             raw() {
                 try {
                     const s = localStorage.getItem(this.key());
-                    if (!s) return { v: 3, vehicles: [], records: [], odometer: [] };
+                    if (!s) return { v: 4, owner: null, vehicles: [], records: [], odometer: [] };
                     const d = JSON.parse(s);
                     if (!d) throw new Error('empty');
-                    // 旧结构（v2）：只有 records
+                    // 旧结构（v2）：只有 records，没有 owner
                     if (Array.isArray(d.records) && !Array.isArray(d.vehicles)) {
-                        return { v: 3, vehicles: [], records: d.records, odometer: [] };
+                        return { v: 4, owner: d.owner || null, vehicles: [], records: d.records, odometer: [] };
                     }
                     return {
-                        v: 3,
+                        v: 4,
+                        owner: d.owner || null,
                         vehicles: Array.isArray(d.vehicles) ? d.vehicles : [],
                         records: Array.isArray(d.records) ? d.records : [],
                         odometer: Array.isArray(d.odometer) ? d.odometer : [],
                     };
                 } catch (e) {
                     console.warn('本地数据读取失败', e);
-                    return { v: 3, vehicles: [], records: [], odometer: [] };
+                    return { v: 4, owner: null, vehicles: [], records: [], odometer: [] };
                 }
             },
             saveRaw(d) {
                 try {
                     localStorage.setItem(this.key(), JSON.stringify({
-                        v: 3,
+                        v: 4,
+                        owner: d.owner || null,
                         vehicles: d.vehicles || [],
                         records: d.records || [],
                         odometer: d.odometer || [],
@@ -2025,6 +2027,58 @@
                     showToast('⚠️ 本地存储空间不足');
                 }
             },
+
+            /** 这批本地数据属于谁：ok=同一账号 / new=首次使用 / foreign=属于别的账号，需要用户确认 */
+            claim(uid) {
+                const d = this.raw();
+                const count = (d.vehicles || []).length + (d.records || []).length + (d.odometer || []).length;
+                if (d.owner === uid) return 'ok';
+                if (!count) {
+                    d.owner = uid;
+                    this.saveRaw(d);
+                    return 'new';
+                }
+                return 'foreign';
+            },
+            /** 认领给当前账号（用户点了「迁移」） */
+            adopt(uid) {
+                const d = this.raw();
+                d.owner = uid;
+                this.saveRaw(d);
+            },
+            /** 归档（用户点了「不是我的」）：原数据另存一份，当前桶清空并归当前账号 */
+            archive(uid) {
+                const d = this.raw();
+                const stamp = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
+                const archiveKey = this.key() + '_archived_' + stamp;
+                try {
+                    localStorage.setItem(archiveKey, JSON.stringify(d));
+                } catch (e) {
+                    console.warn('归档写入失败（空间不足），数据仍在原处', e);
+                }
+                this.saveRaw({ v: 4, owner: uid, vehicles: [], records: [], odometer: [] });
+                return archiveKey;
+            },
+            /** 给确认弹窗用的概况 */
+            summary() {
+                const d = this.raw();
+                const live = (a) => (a || []).filter((x) => !x.deleted);
+                const recs = live(d.records);
+                const odos = live(d.odometer);
+                const vehs = live(d.vehicles);
+                let last = 0;
+                [].concat(recs, odos, vehs).forEach((x) => {
+                    if ((x.updatedAt || 0) > last) last = x.updatedAt;
+                });
+                return {
+                    records: recs.length,
+                    odometer: odos.length,
+                    vehicles: vehs.length,
+                    lastModified: last,
+                    vehicleNames: vehs.map((v) => v.name).slice(0, 3),
+                };
+            },
+
             table(name) { return this.raw()[name] || []; },
             saveTable(name, arr) { const d = this.raw(); d[name] = arr; this.saveRaw(d); },
             visible(name) { return this.table(name).filter(x => !x.deleted); },
@@ -2293,14 +2347,48 @@
             saveRecords(records);
         }
 
+        /**
+         * 清空记录与里程（车辆保留）。
+         * 只清当前选中范围；删除写成墓碑，其他设备也会同步删除。
+         */
         function clearAllData() {
-            if (records.length === 0) return;
-            if (confirm('确定要清除所有数据吗？此操作不可撤销！')) {
-                records = [];
-                saveRecords(records);
-                renderAll();
-                showToast('已清除所有数据');
+            const V = window.Vehicles;
+            const vid = V ? V.currentVehicleId() : '';
+            const resolve = V ? V.resolveVehicleId : (r) => r.vehicleId || '';
+            const scopeName = vid ? ((V && (V.vehicleById(vid) || {}).name) || '当前车辆') : '全部车辆';
+
+            const recs = DB.table('records');
+            const odos = DB.table('odometer');
+            const liveRecs = recs.filter((r) => !r.deleted && (!vid || resolve(r) === vid));
+            const liveOdos = odos.filter((o) => !o.deleted && (!vid || o.vehicleId === vid));
+
+            if (!liveRecs.length && !liveOdos.length) {
+                showToast('没有可清除的记录', 1800);
+                return;
             }
+
+            const msg = '确定清空「' + scopeName + '」的 ' + liveRecs.length + ' 条记录和 ' + liveOdos.length +
+                ' 条里程吗？\n\n车辆本身会保留。此操作不可撤销。';
+            if (!confirm(msg)) return;
+
+            const now = Date.now();
+            liveRecs.forEach((r) => {
+                r.deleted = 1;
+                r.updatedAt = now;
+                r.dirty = 1;
+            });
+            liveOdos.forEach((o) => {
+                o.deleted = 1;
+                o.updatedAt = now;
+                o.dirty = 1;
+            });
+            DB.saveTable('records', recs);
+            DB.saveTable('odometer', odos);
+
+            records = loadRecords();
+            if (typeof renderAll === 'function') renderAll();
+            if (typeof scheduleSync === 'function') scheduleSync(600);
+            showToast('已清空记录与里程（' + scopeName + '，车辆保留）', 2400);
         }
 
         // ================================================================
