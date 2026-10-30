@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>小紫油电记录</title>
-    <meta name="description" content="小紫油电记录 · 增程车充电加油账本，登录后多端同步" />
+    <title>车辆油电记录</title>
+    <meta name="description" content="车辆油电记录 · 增程车充电加油账本，登录后多端同步" />
     <meta name="theme-color" content="#3b82f6" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="小紫油电记录" />
+    <meta name="apple-mobile-web-app-title" content="车辆油电记录" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icons/icon-192.png" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
@@ -1667,7 +1667,7 @@
 <div class="login-screen hidden" id="loginScreen">
     <div class="login-card">
         <div class="login-logo">🚘</div>
-        <div class="login-title">小紫油电记录</div>
+        <div class="login-title">车辆油电记录</div>
         <div class="login-sub">登录后手机和电脑自动同步</div>
 
         <div class="login-tabs" id="authTabs">
@@ -1755,7 +1755,7 @@
     <header class="app-header">
         <div class="top-row">
             <div>
-                <div class="title"><span>🚘</span> 小紫油电记录</div>
+                <div class="title"><span>🚘</span> 车辆油电记录</div>
                 <div class="sub">记录 · 洞察 · 节约</div>
             </div>
             <div class="header-actions">
@@ -2281,32 +2281,80 @@
         //  Excel 导入导出
         // ================================================================
         function exportExcel() {
-            if (records.length === 0) {
+            const V = window.Vehicles;
+            const allRecs = DB.visibleRecords();
+            const allOdo = DB.visible('odometer');
+            if (!allRecs.length && !allOdo.length) {
                 showToast('没有数据可导出');
                 return;
             }
-            const data = records.map(r => ({
-                '日期': r.date,
-                '类型': r.type === 'electric' ? '充电' : '加油',
-                '金额': r.amount,
-                '积分支付': r.usePoints ? '是' : '否',
-                '备注': r.note || '',
-                '创建时间': new Date(r.createTime).toLocaleString()
+
+            const resolve = V ? V.resolveVehicleId : (r) => r.vehicleId || '';
+            const vName = (id) => {
+                const v = V ? V.vehicleById(id) : null;
+                return v ? v.name : '（未归属）';
+            };
+            const typeName = (t) => (t === 'electric' ? '充电' : t === 'gas' ? '加油' : t);
+
+            // ① 能耗记录（所有车辆）
+            const recRows = allRecs
+                .slice()
+                .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : (a.createTime || 0) - (b.createTime || 0)))
+                .map((r) => ({
+                    '车辆': vName(resolve(r)),
+                    '日期': r.date,
+                    '类型': typeName(r.type),
+                    '金额': Number(r.amount) || 0,
+                    '积分支付': r.usePoints ? '是' : '否',
+                    '备注': r.note || '',
+                    '创建时间': new Date(r.createTime || 0).toLocaleString(),
+                }));
+
+            // ② 里程记录
+            const odoRows = allOdo
+                .slice()
+                .sort((a, b) => (a.vehicleId < b.vehicleId ? -1 : a.vehicleId > b.vehicleId ? 1 : a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+                .map((o) => {
+                    const hasEv = o.evKm !== null && o.evKm !== undefined && o.evKm !== '';
+                    return {
+                        '车辆': vName(o.vehicleId),
+                        '日期': o.date,
+                        '总里程(km)': Number(o.totalKm) || 0,
+                        '纯电里程(km)': hasEv ? Number(o.evKm) : '',
+                        '燃油里程(km)': hasEv ? Math.max(0, Number(o.totalKm) - Number(o.evKm)) : '',
+                        '备注': o.note || '',
+                    };
+                });
+
+            // ③ 车辆清单
+            const vehRows = (V ? V.vehicles() : []).map((v) => ({
+                '车辆': v.name,
+                '类型': { fuel: '燃油车', ev: '纯电车', hybrid: '混动车' }[v.type] || v.type,
+                '能耗记录数': allRecs.filter((r) => resolve(r) === v.id).length,
+                '里程记录数': allOdo.filter((o) => o.vehicleId === v.id).length,
             }));
+
             const wb = XLSX.utils.book_new();
-            const ws = XLSX.utils.json_to_sheet(data);
-            ws['!cols'] = [
-                { wch: 14 },
-                { wch: 10 },
-                { wch: 12 },
-                { wch: 10 },
-                { wch: 20 },
-                { wch: 20 }
-            ];
-            XLSX.utils.book_append_sheet(wb, ws, '能耗记录');
-            const fileName = `能耗记录_${new Date().toISOString().slice(0,10)}.xlsx`;
+
+            const ws1 = XLSX.utils.json_to_sheet(recRows);
+            ws1['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 20 }, { wch: 20 }];
+            XLSX.utils.book_append_sheet(wb, ws1, '能耗记录');
+
+            if (odoRows.length) {
+                const ws2 = XLSX.utils.json_to_sheet(odoRows);
+                ws2['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 13 }, { wch: 13 }, { wch: 20 }];
+                XLSX.utils.book_append_sheet(wb, ws2, '里程记录');
+            }
+
+            if (vehRows.length) {
+                const ws3 = XLSX.utils.json_to_sheet(vehRows);
+                ws3['!cols'] = [{ wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 12 }];
+                XLSX.utils.book_append_sheet(wb, ws3, '车辆');
+            }
+
+            const fileName = '油电记录_' + new Date().toISOString().slice(0, 10) + '.xlsx';
             XLSX.writeFile(wb, fileName);
-            showToast(`✅ 成功导出 ${records.length} 条记录`);
+            showToast('✅ 已导出 ' + recRows.length + ' 条记录、' + odoRows.length + ' 条里程', 2200);
         }
 
         function importExcel(file) {

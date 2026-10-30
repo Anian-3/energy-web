@@ -514,10 +514,19 @@
         const readings = odometerOf(vehicleId);
         if (!readings.length) { out.note = '还没有里程记录'; return out; }
 
+        const daysBetween = (a, b) => {
+            const t1 = new Date(String(a) + 'T00:00:00').getTime();
+            const t2 = new Date(String(b) + 'T00:00:00').getTime();
+            if (!isFinite(t1) || !isFinite(t2)) return 9999;
+            return Math.round((t2 - t1) / 86400000);
+        };
+
         let base = null;
         if (from) {
             const before = readings.filter((o) => o.date <= from);
-            base = before.length ? before[before.length - 1] : null;
+            const cand = before.length ? before[before.length - 1] : null;
+            // 起点读数必须离区间开始不远（10 天内）；否则「本月里程」会被放大成好几个月
+            if (cand && daysBetween(cand.date, from) <= 10) base = cand;
             if (!base) {
                 const inRange = readings.filter((o) => o.date >= from && (!to || o.date <= to));
                 base = inRange.length ? inRange[0] : null;
@@ -529,7 +538,10 @@
         const upto = to ? readings.filter((o) => o.date <= to) : readings;
         const last = upto.length ? upto[upto.length - 1] : null;
 
-        if (!base || !last) { out.note = '缺少里程数据'; return out; }
+        if (!base || !last) {
+            out.note = from ? '本月缺少起点读数，记一次里程就能算' : '缺少里程数据';
+            return out;
+        }
         if (base.id === last.id) { out.note = '区间内只有一条里程记录，再记一次才能算'; return out; }
 
         const km = Number(last.totalKm) - Number(base.totalKm);
