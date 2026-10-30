@@ -426,7 +426,8 @@
         const v = currentVehicle();
         if (!v) return;
         const date = byId('odoDate').value;
-        const totalKm = Number(byId('odoTotal').value);
+        const totalRaw = Number(byId('odoTotal').value);
+        const totalKm = Math.round(totalRaw);
         const evRaw = byId('odoEv') ? byId('odoEv').value : '';
         const fuelRaw = byId('odoFuel') ? byId('odoFuel').value : '';
         let evKm = evRaw === '' ? null : Number(evRaw);
@@ -443,6 +444,8 @@
                 toast('纯电 + 燃油 应等于总里程（' + totalKm + ' km）');
                 return;
             }
+            // 数据库里里程是整数列，这里统一取整，避免小数导致同步失败
+            if (evKm != null) evKm = Math.round(evKm);
             if (evKm != null && (evKm < 0 || evKm > totalKm)) {
                 toast('纯电里程应在 0 与总里程之间');
                 return;

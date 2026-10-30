@@ -215,7 +215,7 @@
                     name: v.name,
                     type: v.type,
                     note: v.note || '',
-                    start_odometer: Number(v.startOdometer) || 0,
+                    start_odometer: Math.round(Number(v.startOdometer) || 0),
                     created_at: Number(v.createdAt) || 0,
                     client_ts: Number(v.updatedAt) || 0,
                     deleted: !!v.deleted,
@@ -272,15 +272,18 @@
             path: '/rest/v1/odometer',
             cols: 'id,vehicle_id,date,total_km,ev_km,note,created_at,client_ts,deleted',
             toRow(o) {
+                // 里程列在数据库里是 bigint，必须取整，否则 Postgres 会报
+                // invalid input syntax for type bigint
+                const ev = o.evKm === null || o.evKm === undefined || o.evKm === '' ? null : Math.round(Number(o.evKm));
                 return {
                     id: o.id,
                     vehicle_id: o.vehicleId,
                     date: o.date,
-                    total_km: Number(o.totalKm) || 0,
-                    ev_km: o.evKm === null || o.evKm === undefined || o.evKm === '' ? null : Number(o.evKm),
+                    total_km: Math.round(Number(o.totalKm) || 0),
+                    ev_km: ev,
                     note: o.note || '',
-                    created_at: Number(o.createdAt) || 0,
-                    client_ts: Number(o.updatedAt) || 0,
+                    created_at: Math.round(Number(o.createdAt) || 0),
+                    client_ts: Math.round(Number(o.updatedAt) || 0),
                     deleted: !!o.deleted,
                 };
             },
