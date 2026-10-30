@@ -57,6 +57,9 @@
         .mileage-form .submit-btn:active { transform: scale(.985); }
         .vehicle-form > input { margin-bottom: 10px; }
         .mileage-form > input { margin-bottom: 2px; }
+        .vehicle-form .vf-row { margin: 10px 0 4px; }
+        .vehicle-form .vf-label { font-size: 12.5px; color: var(--text-secondary); font-weight: 600; }
+        .vehicle-form .vf-hint { font-size: 11px; color: #94a3b8; line-height: 1.5; margin-bottom: 8px; }
         .mileage-form .split-row { display: flex; gap: 8px; }
         .mileage-form .split-row input { flex: 1 1 0; min-width: 0; }
     `;
@@ -276,6 +279,7 @@
         byId('vehName').value = v ? v.name : '';
         byId('vehStartOdo').value = v && v.startOdometer ? v.startOdometer : '';
         setVehicleType(v ? v.type : 'hybrid');
+        setFillMode(v ? (v.fillMode || 'full') : 'full');
         byId('vehSubmit').textContent = v ? '保存修改' : '添加';
         byId('vehCancel').style.display = v ? '' : 'none';
     }
@@ -285,11 +289,26 @@
         document.querySelectorAll('#vehTypeToggle button').forEach((b) => {
             b.classList.toggle('active', b.dataset.type === type);
         });
+        // 纯电车没有加油，隐藏「加油习惯」
+        const row = byId('vehFillRow');
+        const hint = byId('vehFillHint');
+        const show = type !== 'ev';
+        if (row) row.style.display = show ? '' : 'none';
+        if (hint) hint.style.display = show ? '' : 'none';
+    }
+
+    function setFillMode(mode) {
+        const value = mode === 'fixed' ? 'fixed' : 'full';
+        byId('vehicleForm').dataset.fill = value;
+        document.querySelectorAll('#vehFillToggle button').forEach((b) => {
+            b.classList.toggle('active', b.dataset.fill === value);
+        });
     }
 
     function saveVehicle() {
         const name = byId('vehName').value.trim();
         const type = byId('vehicleForm').dataset.type || 'hybrid';
+        const fillMode = byId('vehicleForm').dataset.fill === 'fixed' ? 'fixed' : 'full';
         const start = Number(byId('vehStartOdo').value) || 0;
         if (!name) { toast('请填写车辆名称'); return; }
 
@@ -300,6 +319,7 @@
         if (existing) {
             existing.name = name;
             existing.type = type;
+            existing.fillMode = fillMode;
             existing.startOdometer = start;
             existing.updatedAt = now;
             existing.dirty = 1;
@@ -308,6 +328,7 @@
             const id = uid();
             all.push({
                 id, name, type, note: '',
+                fillMode: fillMode,
                 startOdometer: start,
                 createdAt: now, updatedAt: now, dirty: 1, deleted: 0,
             });
@@ -522,43 +543,125 @@
     }
 
     // ───────────────────────── 每公里花费 ─────────────────────────
+    /** 两个 YYYY-MM-DD 相差的天数（b − a） */
+    function daysBetween(a, b) {
+        const t1 = new Date(String(a) + 'T00:00:00').getTime();
+        const t2 = new Date(String(b) + 'T00:00:00').getTime();
+        if (!isFinite(t1) || !isFinite(t2)) return 9999;
+        return Math.round((t2 - t1) / 86400000);
+    }
+
     function monthRange(y, m) {
         const pad = (n) => String(n).padStart(2, '0');
         const last = new Date(y, m + 1, 0).getDate();
         return { from: `${y}-${pad(m + 1)}-01`, to: `${y}-${pad(m + 1)}-${pad(last)}` };
     }
 
+    /** 找离某天最近的里程读数（±maxDays 内），用于满箱法对齐加油记录 */
+    function nearestReading(readings, date, maxDays) {
+        let best = null;
+        let bestDiff = Infinity;
+        for (const r of readings) {
+            const diff = Math.abs(daysBetween(r.date, date));
+            if (diff <= maxDays && diff < bestDiff) {
+                best = r;
+                bestDiff = diff;
+            }
+        }
+        return best;
+    }
+
     /**
-     * 计算某辆车在一段日期内的里程与花费
-     * 口径：
-     *   分母 = 结束读数 − 起始读数（起始读数取「区间开始之前的最后一条」）
-     *   分子 = 起始读数那一天起、到区间结束的金额合计
-     * 这样分子分母覆盖的是同一段时间，不会出现「全部历史金额 ÷ 最近几个月里程」的错配。
+     * 满箱法分段：相邻两次「加油」之间算一段。
+     * 段成本 = 后一次加油的金额（它正好补回了这段烧掉的油）；
+     * 最后一段还没有下一次加油，说明油还在油箱里，不计入。
+     */
+    function tankSegments(vehicleId) {
+        const readings = odometerOf(vehicleId);
+        const fuels = DB.visibleRecords()
+            .filter((r) => resolveVehicleId(r) === vehicleId && r.type === 'gas')
+            .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : (a.createTime || 0) - (b.createTime || 0)));
+
+        const segs = [];
+        for (let i = 1; i < fuels.length; i++) {
+            const a = nearestReading(readings, fuels[i - 1].date, 7);
+            const b = nearestReading(readings, fuels[i].date, 7);
+            if (!a || !b || a.id === b.id) continue;
+            const km = Number(b.totalKm) - Number(a.totalKm);
+            if (!(km > 0)) continue;
+            const aEv = a.evKm != null ? Number(a.evKm) : null;
+            const bEv = b.evKm != null ? Number(b.evKm) : null;
+            segs.push({
+                from: a.date,
+                to: fuels[i].date,
+                km: km,
+                cost: Number(fuels[i].amount) || 0,
+                evKm: aEv != null && bEv != null && bEv >= aEv ? bEv - aEv : null,
+            });
+        }
+        return segs;
+    }
+
+    /**
+     * 计算某辆车在一段日期内的里程与花费。
+     * 两种口径：
+     *   满箱法 tank  —— 每次加满的车：只用「完整的两桶油之间」统计，油箱里剩的油不算
+     *   现金法 cash  —— 纯电车 / 定额加油的车：花费 ÷ 里程，并设里程下限避免离谱数字
      */
     function calcRange(vehicleId, from, to) {
         const v = vehicleById(vehicleId);
         const out = {
             ok: false, km: 0, total: 0, electric: 0, gas: 0,
-            perKm: null, evPerKm: null, fuelPerKm: null, note: '',
+            perKm: null, evPerKm: null, fuelPerKm: null, note: '', mode: 'cash',
             fromDate: '', fromKm: null, toDate: '', toKm: null, spendFrom: '',
         };
         if (!v) return out;
 
+        const useTank = v.type !== 'ev' && v.fillMode !== 'fixed';
+
+        if (useTank) {
+            out.mode = 'tank';
+            const segs = tankSegments(vehicleId).filter(
+                (s) => (!from || s.to >= from) && (!to || s.to <= to)
+            );
+            const totalKm = segs.reduce((s, x) => s + x.km, 0);
+            const totalCost = segs.reduce((s, x) => s + x.cost, 0);
+            if (!segs.length || totalKm <= 0) {
+                out.note = '满箱法需要至少两次加油，且两次附近都记过里程';
+                return out;
+            }
+            out.ok = true;
+            out.km = totalKm;
+            out.total = totalCost;
+            out.perKm = totalCost / totalKm;
+            out.fromDate = segs[0].from;
+            out.toDate = segs[segs.length - 1].to;
+
+            if (v.type === 'hybrid') {
+                const evKm = segs.reduce((s, x) => s + (x.evKm || 0), 0);
+                if (evKm > 0) {
+                    const er = DB.visibleRecords().filter(
+                        (r) => resolveVehicleId(r) === vehicleId && r.type === 'electric' &&
+                            (!from || r.date >= from) && (!to || r.date <= to)
+                    );
+                    const evCost = er.reduce((s, x) => s + (Number(x.amount) || 0), 0);
+                    out.electric = evCost;
+                    out.evPerKm = evCost / evKm;
+                    const fuelKm = totalKm - evKm;
+                    if (fuelKm > 0) out.fuelPerKm = totalCost / fuelKm;
+                }
+            }
+            return out;
+        }
+
+        // ── 现金口径 ──
         const readings = odometerOf(vehicleId);
         if (!readings.length) { out.note = '还没有里程记录'; return out; }
-
-        const daysBetween = (a, b) => {
-            const t1 = new Date(String(a) + 'T00:00:00').getTime();
-            const t2 = new Date(String(b) + 'T00:00:00').getTime();
-            if (!isFinite(t1) || !isFinite(t2)) return 9999;
-            return Math.round((t2 - t1) / 86400000);
-        };
 
         let base = null;
         if (from) {
             const before = readings.filter((o) => o.date <= from);
             const cand = before.length ? before[before.length - 1] : null;
-            // 起点读数必须离区间开始不远（10 天内）；否则「本月里程」会被放大成好几个月
             if (cand && daysBetween(cand.date, from) <= 10) base = cand;
             if (!base) {
                 const inRange = readings.filter((o) => o.date >= from && (!to || o.date <= to));
@@ -579,6 +682,10 @@
 
         const km = Number(last.totalKm) - Number(base.totalKm);
         if (!(km > 0)) { out.note = '里程没有增加，无法计算'; return out; }
+        if (km < 100) {
+            out.note = '行驶里程不足 100 km，参考意义不大';
+            return out;
+        }
 
         const spendFrom = from || base.date;
         const recs = DB.visibleRecords().filter(
@@ -682,7 +789,7 @@
         if (totalR.ok) {
             lines.push(
                 '累计 ' + fmtMoney(totalR.total) + ' ÷ ' + totalR.km + ' km = ' + fmtMoney(totalR.perKm) +
-                '（读数 ' + totalR.fromKm + ' → ' + totalR.toKm + '，' + totalR.spendFrom + ' 起）'
+                (totalR.mode === 'tank' ? '（满箱法 ' + totalR.fromDate + ' 起）' : '（现金口径）')
             );
         } else if (totalR.note) {
             lines.push('累计：' + totalR.note);
@@ -690,7 +797,7 @@
         if (monthR.ok) {
             lines.push(
                 '本月 ' + fmtMoney(monthR.total) + ' ÷ ' + monthR.km + ' km = ' + fmtMoney(monthR.perKm) +
-                '（读数 ' + monthR.fromKm + ' → ' + monthR.toKm + '）'
+                (monthR.mode === 'tank' ? '（满箱法）' : '（现金口径）')
             );
         } else if (monthR.note) {
             lines.push('本月：' + monthR.note);
@@ -748,6 +855,14 @@
             typeToggle.addEventListener('click', (e) => {
                 const btn = e.target.closest('button[data-type]');
                 if (btn) setVehicleType(btn.dataset.type);
+            });
+        }
+
+        const fillToggle = byId('vehFillToggle');
+        if (fillToggle) {
+            fillToggle.addEventListener('click', (e) => {
+                const btn = e.target.closest('button[data-fill]');
+                if (btn) setFillMode(btn.dataset.fill);
             });
         }
 

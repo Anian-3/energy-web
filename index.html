@@ -1654,7 +1654,15 @@
                 <button type="button" data-type="ev">⚡ 纯电车</button>
                 <button type="button" data-type="hybrid" class="active">🔋 混动车</button>
             </div>
-            <input class="note-input" id="vehStartOdo" type="number" inputmode="numeric" placeholder="初始里程 km（选填）" />
+            <div class="vf-row" id="vehFillRow">
+                <span class="vf-label">加油习惯</span>
+                <div class="vtype-toggle vfill-toggle" id="vehFillToggle">
+                    <button type="button" data-fill="full" class="active">每次加满</button>
+                    <button type="button" data-fill="fixed">定额加油</button>
+                </div>
+            </div>
+            <div class="vf-hint" id="vehFillHint">每次加满：用「满箱法」算每公里，更准；定额加油：按实际花钱估算</div>
+            <input class="note-input" id="vehStartOdo" type="number" inputmode="numeric" placeholder="初始里程 km（选填）" style="display:none" />
             <div class="vf-actions">
                 <button class="submit-btn" id="vehSubmit">添加</button>
                 <button class="ghost-btn" id="vehCancel" style="display:none">取消</button>
@@ -1699,7 +1707,7 @@
 
         <div class="field">
             <label for="authUser">账号</label>
-            <input id="authUser" type="text" autocomplete="username" placeholder="3-24 位字母、数字或中文" autocapitalize="none" spellcheck="false" />
+            <input id="authUser" type="text" autocomplete="username" placeholder="字母、数字或下划线，3 位以上" autocapitalize="none" spellcheck="false" maxlength="24" />
         </div>
         <div class="field">
             <label for="authPass">密码</label>

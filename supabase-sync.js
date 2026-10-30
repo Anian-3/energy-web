@@ -156,7 +156,8 @@
 
     // 账号映射：含 @ 当真实邮箱用；否则映射成 <名字>@example.com
     function emailFromUsername(name) {
-        const v = String(name || '').trim().toLowerCase();
+        // 账号名只允许 ASCII；这里再兜一次底，防止历史数据里带中文导致奇怪的邮箱
+        const v = String(name || '').trim().toLowerCase().replace(/[^a-z0-9._@-]/g, '');
         if (!v) return '';
         return v.includes('@') ? v : v + '@example.com';
     }
@@ -208,7 +209,7 @@
         {
             name: 'vehicles',
             path: '/rest/v1/vehicles',
-            cols: 'id,name,type,note,start_odometer,created_at,client_ts,deleted',
+            cols: 'id,name,type,note,start_odometer,fill_mode,created_at,client_ts,deleted',
             toRow(v) {
                 return {
                     id: v.id,
@@ -216,6 +217,7 @@
                     type: v.type,
                     note: v.note || '',
                     start_odometer: Math.round(Number(v.startOdometer) || 0),
+                    fill_mode: v.fillMode === 'fixed' ? 'fixed' : 'full',
                     created_at: Number(v.createdAt) || 0,
                     client_ts: Number(v.updatedAt) || 0,
                     deleted: !!v.deleted,
@@ -228,6 +230,7 @@
                     type: o.type,
                     note: o.note || '',
                     startOdometer: Number(o.start_odometer) || 0,
+                    fillMode: o.fill_mode === 'fixed' ? 'fixed' : 'full',
                     createdAt: Number(o.created_at) || 0,
                     updatedAt: Number(o.client_ts) || 0,
                     deleted: o.deleted ? 1 : 0,
@@ -547,8 +550,11 @@
         const btn = byId('authSubmit');
 
         if (!username || !password) { authError('请输入账号和密码'); return; }
+        if (!/^[A-Za-z0-9._-]{3,24}$/.test(username)) {
+            authError('账号只能用字母、数字、下划线、点或横线，3-24 位（不能用中文）');
+            return;
+        }
         if (loginMode === 'register') {
-            if (username.length < 3) { authError('账号至少 3 位'); return; }
             if (password.length < 6) { authError('密码至少 6 位'); return; }
             if (password !== byId('authPass2').value) { authError('两次输入的密码不一致'); return; }
         }
@@ -659,6 +665,30 @@
             if (btn) setMode(btn.dataset.mode);
         });
         byId('authSubmit').addEventListener('click', doAuth);
+
+        // 账号输入框：只允许 ASCII，中文/符号会被实时过滤掉
+        const userEl = byId('authUser');
+        if (userEl) {
+            let composing = false;
+            const sanitize = () => {
+                const raw = userEl.value;
+                const clean = raw.replace(/[^A-Za-z0-9._-]/g, '');
+                if (clean !== raw) {
+                    userEl.value = clean;
+                    try { userEl.setSelectionRange(clean.length, clean.length); } catch (err) { /* 忽略 */ }
+                    authError('账号不能用中文或符号，只能用字母、数字、下划线');
+                } else if ((byId('authError').textContent || '').indexOf('账号不能用') === 0) {
+                    authError('');
+                }
+            };
+            userEl.addEventListener('compositionstart', () => { composing = true; });
+            userEl.addEventListener('compositionend', () => { composing = false; sanitize(); });
+            userEl.addEventListener('input', (e) => {
+                if (composing || e.isComposing) return;
+                sanitize();
+            });
+            userEl.addEventListener('paste', () => setTimeout(sanitize, 0));
+        }
         ['authUser', 'authPass', 'authPass2'].forEach((id) => {
             byId(id).addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') { e.preventDefault(); doAuth(); }
