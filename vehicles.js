@@ -114,6 +114,18 @@
         return list[0].id;
     }
 
+    /** 当前范围（全部 / 某辆车）是否能记这类账 */
+    function canRecordKind(kind) {
+        const list = vehicles();
+        if (!list.length) return true;
+        if (currentVehicleId) {
+            const v = vehicleById(currentVehicleId);
+            if (!v) return true;
+            return (TYPES[v.type] || TYPES.hybrid).kinds.indexOf(kind) >= 0;
+        }
+        return list.some((v) => (TYPES[v.type] || TYPES.hybrid).kinds.indexOf(kind) >= 0);
+    }
+
     /** 能记这类账的车（用于「全部」视图下选择归属） */
     function candidatesFor(kind) {
         return vehicles().filter((v) => (TYPES[v.type] || TYPES.hybrid).kinds.indexOf(kind) >= 0);
@@ -1115,6 +1127,7 @@
         applyTypeConstraints,
         allowedKinds,
         candidatesFor,
+        canRecordKind,
         typeLabel,
         conflicts,
         refreshConflictUI,

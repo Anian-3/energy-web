@@ -625,8 +625,9 @@
             color: var(--text-secondary);
         }
         .yearly-summary-section .yearly-item .y-detail {
-            margin-top: 2px;
-            font-size: 11px;
+            margin-top: 4px;
+            font-size: 12.5px;
+            line-height: 1.5;
             color: var(--text-secondary);
         }
         .yearly-summary-section .yearly-item .y-detail .e {
@@ -773,7 +774,23 @@
             gap: 12px;
             flex-shrink: 0;
         }
+        .record-item .veh-tag {
+            font-size: 11.5px;
+            color: #64748b;
+            background: #eef2f7;
+            border-radius: 8px;
+            padding: 1px 7px;
+            max-width: 7em;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
         .record-item .right .amount {
+            min-width: 4.6em;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            flex-shrink: 0;
             font-weight: 600;
             font-size: 16px;
         }
@@ -1617,8 +1634,12 @@
             gap: 6px;
             overflow-x: auto;
             scrollbar-width: none;
-            flex: 1;
+            flex: 1 1 0;
+            /* 关键：不加 min-width:0 时，flex 子项的最小宽度等于内容宽度，
+               会被车辆撑开而不是横向滚动 */
+            min-width: 0;
             padding-bottom: 2px;
+            -webkit-overflow-scrolling: touch;
         }
         .vehicle-chips::-webkit-scrollbar { display: none; }
         .vchip {
@@ -1648,6 +1669,12 @@
             background: transparent;
         }
         .vchip-icon { font-size: 13px; }
+        .vchip-name {
+            max-width: 8.5em;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
         .vehicle-add {
             flex: 0 0 auto;
             width: 30px;
@@ -1998,6 +2025,13 @@
             <button class="guide-close" id="changelogClose" title="关闭">✕</button>
         </div>
         <div class="guide-body" id="changelogBody">
+            <h2>v1.4.4 · 2026-10-31</h2>
+            <ul>
+                <li>UI：车辆切换条支持横向滑动，车辆多时长车名自动省略，不再挤成一团</li>
+                <li>UI：「全部车辆」视图的日期详情会标出每笔账的来源车辆；积分标记移到金额前，金额统一右对齐</li>
+                <li>UI：历年汇总的充电 / 加油金额字号加大；单一动力车型只显示对应的那一项</li>
+            </ul>
+
             <h2>v1.4.3 · 2026-10-31</h2>
             <ul>
                 <li>修复：导出的 Excel 文件名只到「日」，同一天导出多次会重名（浏览器自动加 (1)(2)，难以分辨新旧）。现在文件名带日期和时间，精确到秒，例如「油电记录_2026-10-31_145230.xlsx」</li>
@@ -2415,7 +2449,7 @@
         // ================================================================
         // 旧版本用过的键名，登录后可作为「旧数据」导入
         // 应用版本号：升级时只改这一处
-        const APP_VERSION = 'v1.4.3';
+        const APP_VERSION = 'v1.4.4';
 
         const LEGACY_KEY = 'hybrid_energy_records';
 
@@ -3347,6 +3381,12 @@
         function renderYearlySummary() {
             const yearlyData = calcYearlySummaryForAllYears();
             const container = yearlyGridContainer;
+            // 单一动力车型只显示对应的那一项（按当前车辆范围判断）
+            const V = window.Vehicles;
+            const canE = V && V.canRecordKind ? V.canRecordKind('electric') : true;
+            const canG = V && V.canRecordKind ? V.canRecordKind('gas') : true;
+            const showElectric = canE;
+            const showGas = canG;
 
             if (yearlyData.length === 0) {
                 container.innerHTML = `<div class="empty-yearly">📭 暂无年度数据</div>`;
@@ -3361,8 +3401,8 @@
                                 <div class="y-year">${item.year}年</div>
                                 <div class="y-amount">${formatAmount(item.total)}</div>
                                 <div class="y-detail">
-                                    <div class="e">⚡ ${formatAmount(item.electric)}</div>
-                                    <div class="g">⛽ ${formatAmount(item.gas)}</div>
+                                    ${showElectric ? `<div class="e">⚡ ${formatAmount(item.electric)}</div>` : ''}
+                                    ${showGas ? `<div class="g">⛽ ${formatAmount(item.gas)}</div>` : ''}
                                 </div>
                             </div>
                         `;
@@ -3579,6 +3619,29 @@
         // ================================================================
         let sheetOpen = false;
 
+        /** 简单的 HTML 转义（车辆名可能被用户随便起） */
+        function escText(str) {
+            return String(str == null ? '' : str).replace(/[&<>"']/g, (c) => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+            }[c]));
+        }
+
+        /** 是否需要在记录行显示来源车辆（只在「全部」视图） */
+        function showVehTag(r) {
+            const V = window.Vehicles;
+            if (!V || !V.currentVehicleId) return false;
+            if (V.currentVehicleId()) return false;
+            return !!(r && r.vehicleId) || !!(V.vehicles && V.vehicles().length > 1);
+        }
+
+        function vehNameOf(r) {
+            const V = window.Vehicles;
+            if (!V) return '';
+            const id = V.resolveVehicleId ? V.resolveVehicleId(r) : r.vehicleId;
+            const v = V.vehicleById ? V.vehicleById(id) : null;
+            return v ? v.name : '';
+        }
+
         function renderSheet(dateStr) {
             const { year, month, day } = parseDate(dateStr);
             sheetDate.textContent = `${year}年${month + 1}月${day}日`;
@@ -3596,15 +3659,18 @@
                     const amountCls = r.type === 'electric' ? 'e' : 'g';
                     const note = r.note ? `<span class="note">${r.note}</span>` : '';
                     const pointsMark = r.usePoints ? `<span class="points-mark">🎫积分</span>` : '';
+                    // 「全部车辆」视图下，标出这笔属于哪辆车
+                    const vehMark = showVehTag(r) ? `<span class="veh-tag">${escText(vehNameOf(r))}</span>` : '';
                     html += `
                                 <div class="record-item" data-id="${r.id}">
                                     <div class="left">
                                         <span class="type-badge ${typeCls}">${typeLabel}</span>
+                                        ${vehMark}
                                         <span class="info-text">${note}</span>
                                     </div>
                                     <div class="right">
-                                        <span class="amount ${amountCls}">${formatAmount(r.amount)}</span>
                                         ${pointsMark}
+                                        <span class="amount ${amountCls}">${formatAmount(r.amount)}</span>
                                         <button class="del-btn" data-id="${r.id}">✕</button>
                                     </div>
                                 </div>
