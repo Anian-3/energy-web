@@ -1084,14 +1084,14 @@
     flex: 1 1 auto;
 }
 .app-header .title {
-    font-size: 19px;
+    font-size: 17px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 .header-actions {
     flex: 0 0 auto;
-    gap: 5px;
+    gap: 4px;
 }
 .header-actions button {
     width: 32px;
@@ -1099,9 +1099,9 @@
     font-size: 15px;
 }
 .header-actions .excel-btn {
-    padding: 0 9px;
+    padding: 0 7px;
     height: 32px;
-    font-size: 13px;
+    font-size: 12.5px;
     white-space: nowrap;
 }
 
@@ -1377,6 +1377,99 @@
     margin-top: 12px;
     line-height: 1.6;
 }
+
+        /* ===== 版本号 ===== */
+        .app-header .sub .ver { opacity: 0.55; font-size: 11px; margin-left: 2px; }
+
+        /* ===== 使用说明页 ===== */
+        .guide-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 500;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+        }
+        .guide-screen.hidden { display: none; }
+        .guide-head {
+            flex: 0 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px;
+            border-bottom: 1px solid #eef2f7;
+            background: #fff;
+        }
+        .guide-title { font-size: 16px; font-weight: 700; }
+        .guide-close {
+            border: none;
+            background: #f1f5f9;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            font-size: 15px;
+            color: #475569;
+            cursor: pointer;
+        }
+        .guide-body {
+            flex: 1 1 auto;
+            overflow-y: auto;
+            padding: 16px 18px 60px;
+            font-size: 14px;
+            line-height: 1.75;
+            color: #1e293b;
+            -webkit-overflow-scrolling: touch;
+        }
+        .guide-body h1 { font-size: 19px; margin: 8px 0 12px; }
+        .guide-body h2 {
+            font-size: 16px;
+            margin: 22px 0 8px;
+            padding-top: 12px;
+            border-top: 1px solid #eef2f7;
+            color: #1e3a8a;
+        }
+        .guide-body h3 { font-size: 14.5px; margin: 16px 0 6px; color: #334155; }
+        .guide-body h4 { font-size: 13.5px; margin: 12px 0 4px; color: #475569; }
+        .guide-body p { margin: 8px 0; }
+        .guide-body ul, .guide-body ol { margin: 8px 0 8px 20px; }
+        .guide-body li { margin: 3px 0; }
+        .guide-body code {
+            background: #f1f5f9;
+            border-radius: 4px;
+            padding: 1px 4px;
+            font-size: 12.5px;
+            color: #b91c1c;
+        }
+        .guide-body pre {
+            background: #f8fafc;
+            border: 1px solid #eef2f7;
+            border-radius: 10px;
+            padding: 10px 12px;
+            overflow-x: auto;
+            font-size: 11.5px;
+            line-height: 1.5;
+            color: #334155;
+        }
+        .guide-body pre code { background: none; color: inherit; padding: 0; }
+        .guide-body blockquote {
+            margin: 8px 0;
+            padding: 8px 12px;
+            background: #f8fafc;
+            border-left: 3px solid #cbd5e1;
+            border-radius: 6px;
+            color: #475569;
+            font-size: 13px;
+        }
+        .guide-body hr { border: none; border-top: 1px solid #eef2f7; margin: 16px 0; }
+        .guide-body .g-table { overflow-x: auto; margin: 10px 0; }
+        .guide-body table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+        .guide-body th, .guide-body td {
+            border: 1px solid #e2e8f0;
+            padding: 6px 8px;
+            text-align: left;
+            vertical-align: top;
+        }
+        .guide-body th { background: #f1f5f9; font-weight: 600; white-space: nowrap; }
 
         /* ===== 车辆切换条 ===== */
         .vehicle-bar {
@@ -1689,8 +1782,20 @@
                 <div class="hint" id="odoEvHint">两个填一个即可，另一个自动算（纯电 + 燃油 = 总里程）</div>
             </div>
             <button class="submit-btn" id="odoSubmit">保存</button>
+            <div class="hint" style="text-align:center;margin-top:2px;">
+                <a href="#" id="odoAutoToggle" style="color:#94a3b8;text-decoration:none;font-size:11.5px;"></a>
+            </div>
         </div>
         <div class="mileage-list" id="mileageList"></div>
+    </div>
+
+    <!-- ===== 使用说明（全屏） ===== -->
+    <div class="guide-screen hidden" id="guideScreen">
+        <div class="guide-head">
+            <span class="guide-title">使用说明</span>
+            <button class="guide-close" id="guideClose" title="关闭">✕</button>
+        </div>
+        <div class="guide-body" id="guideBody"></div>
     </div>
 
 <!-- ===== 登录 / 注册（新增） ===== -->
@@ -1752,6 +1857,10 @@
             <span class="k">本机记录</span>
             <span class="v" id="acctCount">0 条</span>
         </div>
+        <div class="acct-item">
+            <span class="k">版本</span>
+            <span class="v" id="acctVersion">—</span>
+        </div>
     </div>
 
     <div class="acct-pwd" id="acctPwdBox">
@@ -1771,6 +1880,7 @@
 
     <div class="acct-actions">
         <button class="acct-act primary" id="acctSync">立即同步</button>
+        <button class="acct-act ghost" id="acctGuide">📖 使用说明</button>
         <button class="acct-act ghost" id="acctSetup">服务器设置</button>
         <button class="acct-act ghost" id="acctPwdBtn">修改密码</button>
         <button class="acct-act danger" id="acctLogout">退出登录</button>
@@ -1786,12 +1896,13 @@
         <div class="top-row">
             <div>
                 <div class="title"><span>🚘</span> 车辆油电记录</div>
-                <div class="sub">记录 · 洞察 · 节约</div>
+                <div class="sub">记录 · 洞察 · 节约<span class="ver" id="appVersion"></span></div>
             </div>
             <div class="header-actions">
                 <button class="excel-btn acct-btn" id="acctBtn" title="账号与同步"><span class="sync-dot" id="syncDot"></span>👤</button>
                 <button class="excel-btn" id="exportExcelBtn" title="导出Excel">📤<span class="btn-label">导出</span></button>
                 <button class="excel-btn" id="importExcelBtn" title="导入Excel">📥<span class="btn-label">导入</span></button>
+                <button id="guideBtn" title="使用说明">❓</button>
                 <button id="clearAllBtn" title="清空记录与里程（车辆保留）">🗑</button>
             </div>
         </div>
@@ -1976,6 +2087,9 @@
         //  数据层
         // ================================================================
         // 旧版本用过的键名，登录后可作为「旧数据」导入
+        // 应用版本号：升级时只改这一处
+        const APP_VERSION = 'v1.4';
+
         const LEGACY_KEY = 'hybrid_energy_records';
 
         // 当前登录账号（未登录为 null）；由 supabase-sync.js 设置
@@ -3318,6 +3432,11 @@
                 inputNote.value = '';
                 document.getElementById('usePoints').checked = false;
                 inputAmount.focus();
+
+                // 记完一笔，顺手引导记里程（可在里程面板里关掉）
+                if (window.Vehicles && typeof window.Vehicles.afterAddRecord === 'function') {
+                    window.Vehicles.afterAddRecord(date);
+                }
             }
         }
 
@@ -3428,11 +3547,20 @@
         }
 
         // 启动逻辑交由 auth-sync.js：先判断登录状态，再初始化界面
+        function paintVersion() {
+            const el = document.getElementById('appVersion');
+            if (el) el.textContent = ' · ' + APP_VERSION;
+            const acct = document.getElementById('acctVersion');
+            if (acct) acct.textContent = APP_VERSION;
+        }
+
         document.addEventListener('DOMContentLoaded', function () {
+            paintVersion();
             if (typeof window.__boot === 'function') window.__boot();
             else init();
         });
     </script>
+    <script src="./guide.js"></script>
     <script src="./vehicles.js"></script>
     <script src="./supabase-sync.js"></script>
 

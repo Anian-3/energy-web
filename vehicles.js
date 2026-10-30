@@ -119,6 +119,43 @@
         } catch (e) { /* 忽略 */ }
     }
 
+    // ───────────────── 记账后自动提醒记里程 ─────────────────
+    function autoOdoKey() {
+        return (typeof DB !== 'undefined' ? DB.key() : 'guest') + '_autoodo';
+    }
+
+    function autoOdoEnabled() {
+        try {
+            return localStorage.getItem(autoOdoKey()) !== 'off';
+        } catch (e) {
+            return true;
+        }
+    }
+
+    function paintAutoOdo() {
+        const link = byId('odoAutoToggle');
+        if (!link) return;
+        link.textContent = autoOdoEnabled() ? '以后不再自动弹出' : '已关闭自动弹出，点此重新开启';
+    }
+
+    function setAutoOdo(on) {
+        try {
+            localStorage.setItem(autoOdoKey(), on ? 'on' : 'off');
+        } catch (e) { /* 忽略 */ }
+        paintAutoOdo();
+    }
+
+    /** 记完一笔账后调用：关掉记账面板，顺手弹出里程面板（可跳过） */
+    function afterAddRecord(date) {
+        if (!autoOdoEnabled()) return;
+        if (!currentVehicleId) return; // 「全部车辆」下不知道记给哪辆车
+        if (typeof closeSheet === 'function') closeSheet();
+        setTimeout(() => {
+            if (isAllMode()) return;
+            openMileageSheet(date);
+        }, 280);
+    }
+
     function restoreSelection() {
         let saved = '';
         try {
@@ -405,6 +442,7 @@
         byId('odoEvHint').style.display = v.type === 'hybrid' ? '' : 'none';
         byId('odoEvHint').textContent = '两个填一个即可，另一个自动算（纯电 + 燃油 = 总里程）';
         renderMileageList();
+        paintAutoOdo();
         byId('mileageSheet').classList.add('active');
         byId('mileageOverlay').classList.add('active');
         setTimeout(() => byId('odoTotal').focus(), 260);
@@ -891,6 +929,16 @@
         const odoSubmit = byId('odoSubmit');
         if (odoSubmit) odoSubmit.addEventListener('click', saveOdometer);
 
+        const autoToggle = byId('odoAutoToggle');
+        if (autoToggle) {
+            autoToggle.addEventListener('click', (e) => {
+                e.preventDefault();
+                const next = !autoOdoEnabled();
+                setAutoOdo(next);
+                toast(next ? '已开启：记账后自动提醒记里程' : '已关闭：记账后不再自动弹出', 2200);
+            });
+        }
+
         ['odoTotal', 'odoEv', 'odoFuel'].forEach((id) => {
             const el = byId(id);
             if (el) el.addEventListener('input', updateOdoPreview);
@@ -925,6 +973,8 @@
         renderPerKm,
         applyTypeConstraints,
         openVehicleSheet,
+        openMileageSheet,
+        afterAddRecord,
         calcRange,
         monthRange,
         escapeHtml,

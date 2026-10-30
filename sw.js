@@ -1,9 +1,10 @@
 /* 小紫油电记录 · Service Worker
    目标：装到桌面后断网也能打开、能记录；接口请求永不缓存。 */
-const CACHE = 'er-shell-v16';
+const CACHE = 'er-shell-v17';
 const SHELL = [
   './',
   './index.html',
+  './guide.js',
   './vehicles.js',
   './supabase-sync.js',
   './vendor/chart-lite.js',

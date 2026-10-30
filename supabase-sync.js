@@ -646,6 +646,29 @@
 
     function wireAccountUI() {
         byId('acctBtn').addEventListener('click', openAccount);
+
+        // 使用说明（全屏页）
+        const openGuide = () => {
+            const body = byId('guideBody');
+            if (body && !body.innerHTML.trim()) {
+                body.innerHTML = window.GUIDE_HTML || '<p>说明内容缺失</p>';
+            }
+            byId('guideScreen').classList.remove('hidden');
+            if (body) body.scrollTop = 0;
+        };
+        const closeGuide = () => byId('guideScreen').classList.add('hidden');
+
+        const guideBtn = byId('guideBtn');
+        if (guideBtn) guideBtn.addEventListener('click', openGuide);
+        const acctGuide = byId('acctGuide');
+        if (acctGuide) {
+            acctGuide.addEventListener('click', () => {
+                closeAccount();
+                openGuide();
+            });
+        }
+        const guideClose = byId('guideClose');
+        if (guideClose) guideClose.addEventListener('click', closeGuide);
         byId('acctMask').addEventListener('click', closeAccount);
         byId('acctSync').addEventListener('click', () => { toast('正在同步…', 900); syncNow({ manual: true }); });
         byId('acctPwdBtn').addEventListener('click', () => {
@@ -655,7 +678,14 @@
         byId('acctLogout').addEventListener('click', logout);
         byId('acctSetup').addEventListener('click', () => { closeAccount(); showSetup(); });
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeAccount();
+            if (e.key === 'Escape') {
+                const g = byId('guideScreen');
+                if (g && !g.classList.contains('hidden')) {
+                    g.classList.add('hidden');
+                    return;
+                }
+                closeAccount();
+            }
         });
     }
 
