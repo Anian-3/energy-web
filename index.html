@@ -1652,8 +1652,11 @@
             <input class="note-input" id="odoDate" type="date" />
             <input class="amount-input" id="odoTotal" type="number" inputmode="numeric" placeholder="当前总里程（km）" />
             <div id="odoEvField">
-                <input class="amount-input" id="odoEv" type="number" inputmode="numeric" placeholder="纯电里程（km，选填）" />
-                <div class="hint" id="odoEvHint">填了纯电里程，才能分别算出「用电 / 用油」每公里</div>
+                <div class="split-row">
+                    <input class="amount-input" id="odoEv" type="number" inputmode="numeric" placeholder="纯电里程 km" />
+                    <input class="amount-input" id="odoFuel" type="number" inputmode="numeric" placeholder="燃油里程 km" />
+                </div>
+                <div class="hint" id="odoEvHint">两个填一个即可，另一个自动算（纯电 + 燃油 = 总里程）</div>
             </div>
             <button class="submit-btn" id="odoSubmit">保存</button>
         </div>

@@ -57,6 +57,8 @@
         .mileage-form .submit-btn:active { transform: scale(.985); }
         .vehicle-form > input { margin-bottom: 10px; }
         .mileage-form > input { margin-bottom: 2px; }
+        .mileage-form .split-row { display: flex; gap: 8px; }
+        .mileage-form .split-row input { flex: 1 1 0; min-width: 0; }
     `;
 
     (function injectStyles() {
@@ -347,8 +349,10 @@
         byId('odoDate').value = typeof getTodayStr === 'function' ? getTodayStr() : new Date().toISOString().slice(0, 10);
         byId('odoTotal').value = '';
         byId('odoEv').value = '';
+        if (byId('odoFuel')) byId('odoFuel').value = '';
         byId('odoEvField').style.display = v.type === 'hybrid' ? '' : 'none';
         byId('odoEvHint').style.display = v.type === 'hybrid' ? '' : 'none';
+        byId('odoEvHint').textContent = '两个填一个即可，另一个自动算（纯电 + 燃油 = 总里程）';
         renderMileageList();
         byId('mileageSheet').classList.add('active');
         byId('mileageOverlay').classList.add('active');
@@ -373,10 +377,11 @@
             .slice(0, 30)
             .map((o) => {
                 const ev = o.evKm != null && o.evKm !== '' ? ` · 纯电 ${o.evKm}` : '';
+                const fuel = o.evKm != null && o.evKm !== '' ? ` · 燃油 ${Number(o.totalKm) - Number(o.evKm)}` : '';
                 return `<div class="orow">
                     <div>
                         <div class="orow-km">${o.totalKm} km</div>
-                        <div class="orow-sub">${o.date}${ev}</div>
+                        <div class="orow-sub">${o.date}${ev}${fuel}</div>
                     </div>
                     <button class="orow-del" data-id="${o.id}" title="删除">✕</button>
                 </div>`;
@@ -387,17 +392,62 @@
         });
     }
 
+    /** 里程表单的实时提示：说明另一个字段会被算成多少 */
+    function updateOdoPreview() {
+        const hint = byId('odoEvHint');
+        if (!hint) return;
+        const v = currentVehicle();
+        if (!v || v.type !== 'hybrid') return;
+
+        const total = Number(byId('odoTotal').value);
+        const evRaw = byId('odoEv').value;
+        const fuelEl = byId('odoFuel');
+        const fuelRaw = fuelEl ? fuelEl.value : '';
+
+        if (!total || total <= 0) {
+            hint.textContent = '两个填一个即可，另一个自动算（纯电 + 燃油 = 总里程）';
+            return;
+        }
+        if (evRaw !== '' && fuelRaw === '') {
+            hint.textContent = '燃油里程将记为 ' + Math.max(0, total - Number(evRaw)) + ' km';
+        } else if (fuelRaw !== '' && evRaw === '') {
+            hint.textContent = '纯电里程将记为 ' + Math.max(0, total - Number(fuelRaw)) + ' km';
+        } else if (evRaw !== '' && fuelRaw !== '') {
+            const sum = Number(evRaw) + Number(fuelRaw);
+            hint.textContent = Math.abs(sum - total) <= 1
+                ? '纯电 ' + evRaw + ' + 燃油 ' + fuelRaw + ' = ' + total + ' km ✓'
+                : '两个都填了，合计 ' + sum + ' km，与总里程 ' + total + ' km 不一致';
+        } else {
+            hint.textContent = '两个填一个即可，另一个自动算（纯电 + 燃油 = 总里程）';
+        }
+    }
+
     function saveOdometer() {
         const v = currentVehicle();
         if (!v) return;
         const date = byId('odoDate').value;
         const totalKm = Number(byId('odoTotal').value);
-        const evRaw = byId('odoEv').value;
-        const evKm = evRaw === '' ? null : Number(evRaw);
+        const evRaw = byId('odoEv') ? byId('odoEv').value : '';
+        const fuelRaw = byId('odoFuel') ? byId('odoFuel').value : '';
+        let evKm = evRaw === '' ? null : Number(evRaw);
 
         if (!date) { toast('请选择日期'); return; }
         if (!Number.isFinite(totalKm) || totalKm <= 0) { toast('请填写有效的总里程'); return; }
-        if (v.type === 'hybrid' && evKm != null && evKm > totalKm) { toast('纯电里程不能大于总里程'); return; }
+
+        const fuelKm = fuelRaw === '' ? null : Number(fuelRaw);
+
+        if (v.type === 'hybrid') {
+            // 纯电 / 燃油 只需填一个，另一个由总里程反算
+            if (evKm == null && fuelKm != null) evKm = totalKm - fuelKm;
+            if (evKm != null && fuelKm != null && Math.abs(evKm + fuelKm - totalKm) > 1) {
+                toast('纯电 + 燃油 应等于总里程（' + totalKm + ' km）');
+                return;
+            }
+            if (evKm != null && (evKm < 0 || evKm > totalKm)) {
+                toast('纯电里程应在 0 与总里程之间');
+                return;
+            }
+        }
 
         const all = DB.table('odometer');
         const now = Date.now();
@@ -417,6 +467,7 @@
 
         byId('odoTotal').value = '';
         byId('odoEv').value = '';
+        if (byId('odoFuel')) byId('odoFuel').value = '';
         renderMileageList();
         renderPerKm();
         if (typeof scheduleSync === 'function') scheduleSync(800);
@@ -645,6 +696,11 @@
         if (mClose) mClose.addEventListener('click', closeMileageSheet);
         const odoSubmit = byId('odoSubmit');
         if (odoSubmit) odoSubmit.addEventListener('click', saveOdometer);
+
+        ['odoTotal', 'odoEv', 'odoFuel'].forEach((id) => {
+            const el = byId(id);
+            if (el) el.addEventListener('input', updateOdoPreview);
+        });
 
         // 打开记账面板时，按当前车型限制可选的能源类型
         const fab = byId('fabAdd');
