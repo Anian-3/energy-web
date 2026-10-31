@@ -1625,6 +1625,112 @@
         }
         .guide-body th { background: #f1f5f9; font-weight: 600; white-space: nowrap; }
 
+        /* ===== 充电省钱账 ===== */
+        .save-card {
+            background: linear-gradient(135deg, #ecfdf5, #f0fdfa);
+            border: 1px solid #cceee4;
+            margin: 0 16px 16px;
+            border-radius: 16px;
+            padding: 14px 16px;
+        }
+        .save-head { font-size: 12.5px; color: #0f766e; font-weight: 600; }
+        .save-amount {
+            font-size: 27px;
+            font-weight: 800;
+            color: #0f766e;
+            margin-top: 2px;
+            letter-spacing: -0.5px;
+        }
+        .save-amount.zero { color: #94a3b8; }
+        .save-detail { font-size: 11.5px; color: #64748b; margin-top: 4px; line-height: 1.55; }
+        .save-bar { height: 6px; background: #d7eeea; border-radius: 6px; margin-top: 10px; overflow: hidden; }
+        .save-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #34d399, #0d9488);
+            border-radius: 6px;
+            transition: width 0.3s;
+        }
+        .save-foot { font-size: 11px; color: #64748b; margin-top: 6px; }
+        .annual-saving { margin-top: 8px; font-size: 12.5px; color: #0f766e; font-weight: 600; }
+
+        /* ===== 里程催记 ===== */
+        .pk-remind {
+            font-size: 11.5px;
+            color: #b45309;
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            border-radius: 10px;
+            padding: 6px 10px;
+            margin-top: 8px;
+            line-height: 1.5;
+        }
+        .pk-remind.warn { color: #b91c1c; background: #fef2f2; border-color: #fecaca; }
+
+        /* ===== 记账快捷胶囊 ===== */
+        .quick-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+        .quick-row:empty { display: none; }
+        .qchip {
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            color: #475569;
+            border-radius: 14px;
+            padding: 5px 11px;
+            font-size: 12px;
+            font-family: inherit;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .qchip:active { background: #f1f5f9; }
+        .qchip.last { border-color: #c7d2fe; color: #4f46e5; }
+        .qchip.note { border-style: dashed; max-width: 9em; overflow: hidden; text-overflow: ellipsis; }
+
+        /* ===== 月度小结 ===== */
+        .report-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 420;
+            background: rgba(15, 23, 42, 0.55);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        .report-screen.hidden { display: none; }
+        .report-card {
+            background: #fff;
+            border-radius: 20px;
+            padding: 20px;
+            width: 100%;
+            max-width: 320px;
+            box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+        }
+        .report-head { font-size: 15px; font-weight: 700; text-align: center; margin-bottom: 14px; }
+        .rep-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 13px;
+        }
+        .rep-row:last-child { border-bottom: none; }
+        .rep-k { color: #64748b; }
+        .rep-v { font-weight: 600; color: #1e293b; font-variant-numeric: tabular-nums; }
+        .report-close {
+            width: 100%;
+            margin-top: 16px;
+            border: none;
+            border-radius: 12px;
+            padding: 12px;
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            color: #fff;
+            font-size: 15px;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+        }
+        .acct-item.acct-enter { cursor: pointer; }
+
         /* ===== 车辆切换条 ===== */
         .vehicle-bar {
             display: flex;
@@ -1980,6 +2086,15 @@
         <div class="pick-list" id="pickList"></div>
     </div>
 
+    <!-- ===== 月度小结 ===== -->
+    <div class="report-screen hidden" id="reportScreen">
+        <div class="report-card">
+            <div class="report-head">📅 <span id="reportTitle">月度小结</span></div>
+            <div class="report-body" id="reportBody"></div>
+            <button class="report-close" id="reportClose">知道了</button>
+        </div>
+    </div>
+
     <!-- ===== 数据检查（类型冲突） ===== -->
     <div class="overlay" id="conflictOverlay"></div>
     <div class="bottom-sheet" id="conflictSheet">
@@ -2028,6 +2143,17 @@
             <button class="guide-close" id="changelogClose" title="关闭">✕</button>
         </div>
         <div class="guide-body" id="changelogBody">
+            <h2>v1.5.0 · 2026-10-31</h2>
+            <ul>
+                <li>新增「靠充电省下多少钱」：本月多一张卡片，算出「如果全烧油要花 A，你实际花了 B，省了 C」；
+                    年度汇总也会显示今年累计省下的钱（混动 / 增程车专属，纯电车自动隐藏）</li>
+                <li>新增「月度小结」：每月第一次打开会弹一张上月账单（总花费、环比涨跌、里程、每公里、省下的钱），
+                    也可以在账号面板里随时回看</li>
+                <li>记账更快：金额下方给出你历史上最常用的几个金额和「上次金额」，点一下就填；
+                    备注框点开后可以选最近用过的备注</li>
+                <li>里程催记：距上次记里程超过 7 天，每公里卡片会提醒你补一次读数（超过 30 天变红色警示）</li>
+            </ul>
+
             <h2>v1.4.5 · 2026-10-31</h2>
             <ul>
                 <li>UI：日期详情里的车辆名标签改成青绿色小徽章，和后面的灰色备注文字区分开，一眼能看出「哪个是车、哪个是备注」</li>
@@ -2212,6 +2338,10 @@
             <span class="k">版本</span>
             <span class="v" id="acctVersion">—</span>
         </div>
+        <div class="acct-item acct-enter" id="acctReportRow">
+            <span class="k">📅 月度小结</span>
+            <span class="v">查看 ›</span>
+        </div>
         <div class="acct-item acct-warn" id="acctConflictRow" style="display:none">
             <span class="k">⚠️ 数据检查</span>
             <span class="v" id="acctConflict">0 条</span>
@@ -2320,6 +2450,7 @@
                     </div>
                 </div>
             </div>
+            <div class="annual-saving" id="annualSaving" style="display:none"></div>
             <div class="year-nav">
                 <button class="nav-btn" id="prevYearBtn">‹</button>
                 <span class="year-label" id="yearLabel">2026年</span>
@@ -2331,6 +2462,15 @@
         </div>
     </div>
 
+
+    <!-- ===== 充电省钱账 ===== -->
+    <div class="save-card" id="saveCard" style="display:none">
+        <div class="save-head">💡 本月靠充电省下</div>
+        <div class="save-amount" id="saveAmount">¥0.00</div>
+        <div class="save-detail" id="saveDetail"></div>
+        <div class="save-bar"><div class="save-bar-fill" id="saveBarFill" style="width:0"></div></div>
+        <div class="save-foot" id="saveFoot"></div>
+    </div>
 
     <!-- ===== 每公里花费 ===== -->
     <div class="perkm-card" id="perkmCard">
@@ -2358,6 +2498,7 @@
                 </div>
             </div>
         </div>
+        <div class="pk-remind" id="pkRemind" style="display:none"></div>
         <div class="perkm-foot" id="pkFoot">还没有里程记录</div>
     </div>
 
@@ -2445,6 +2586,8 @@
                     <input type="checkbox" id="usePoints" /> 🎫 积分
                 </label>
             </div>
+            <div class="quick-row" id="quickAmounts"></div>
+            <div class="quick-row" id="quickNotes" style="display:none"></div>
             <div class="form-row row-note">
                 <input class="note-input" id="inputNote" type="text" placeholder="备注（选填）" maxlength="50" />
                 <button class="submit-btn" id="submitRecord">添加</button>
@@ -2458,7 +2601,7 @@
         // ================================================================
         // 旧版本用过的键名，登录后可作为「旧数据」导入
         // 应用版本号：升级时只改这一处
-        const APP_VERSION = 'v1.4.5';
+        const APP_VERSION = 'v1.5.0';
 
         const LEGACY_KEY = 'hybrid_energy_records';
 
@@ -3329,6 +3472,7 @@
             annualTotalAmount.textContent = formatAmount(total);
             annualElectricTotal.textContent = formatAmount(electric);
             annualGasTotal.textContent = formatAmount(gas);
+            renderAnnualSaving();
             yearLabel.textContent = `${annualYear}年`;
         }
 
@@ -3751,6 +3895,7 @@
         function openSheet(dateStr) {
             selectedDate = dateStr;
             renderSheet(dateStr);
+            if (typeof renderQuickPicks === 'function') renderQuickPicks();
             bottomSheet.classList.add('active');
             overlay.classList.add('active');
             sheetOpen = true;
@@ -3786,8 +3931,276 @@
             }
         }
 
+        // ================================================================
+        //  v1.5.0：省钱账 / 月度小结 / 记账快捷
+        // ================================================================
+        const pad2 = (n) => String(n).padStart(2, '0');
+        const monthFirst = (y, m) => y + '-' + pad2(m + 1) + '-01';
+        const monthLast = (y, m) => y + '-' + pad2(m + 1) + '-' + pad2(new Date(y, m + 1, 0).getDate());
+        const yearFirst = (y) => y + '-01-01';
+        const yearLast = (y) => y + '-12-31';
+
+        /** 本月靠充电省下的钱（只有混动 / 增程车才有意义） */
+        function calcMonthSaving(y, m) {
+            const V = window.Vehicles;
+            if (!V || !V.currentVehicleId) return null;
+            const vid = V.currentVehicleId();
+            if (!vid) return null;
+            const v = V.vehicleById(vid);
+            if (!v || v.type !== 'hybrid') return null;
+
+            const r = V.calcRange(vid, monthFirst(y, m), monthLast(y, m));
+            if (!r || !r.ok || !(r.km > 0)) return null;
+
+            const sum = calcMonthSummary(y, m);
+            const actual = (sum.electric || 0) + (sum.gas || 0);
+
+            let fuelPerKm = r.fuelPerKm > 0 ? r.fuelPerKm : 0;
+            let est = false;
+            if (!fuelPerKm) {
+                const hist = V.calcRange(vid, '', '');
+                if (hist && hist.ok && hist.fuelPerKm > 0) {
+                    fuelPerKm = hist.fuelPerKm;
+                    est = true;
+                }
+            }
+            if (!fuelPerKm) return null;
+
+            const fullOil = r.km * fuelPerKm;
+            return {
+                saved: fullOil - actual,
+                fullOil: fullOil,
+                actual: actual,
+                km: r.km,
+                evKm: r.evKm || 0,
+                evRatio: (r.evKm || 0) / r.km,
+                est: est,
+            };
+        }
+
+        /** 全年靠充电省下的钱 */
+        function calcYearSaving(year) {
+            const V = window.Vehicles;
+            if (!V || !V.currentVehicleId) return null;
+            const vid = V.currentVehicleId();
+            if (!vid) return null;
+            const v = V.vehicleById(vid);
+            if (!v || v.type !== 'hybrid') return null;
+
+            const r = V.calcRange(vid, yearFirst(year), yearLast(year));
+            if (!r || !r.ok || !(r.km > 0)) return null;
+
+            const sum = calcYearSummary(year);
+            const actual = (sum.electric || 0) + (sum.gas || 0);
+
+            let fuelPerKm = r.fuelPerKm > 0 ? r.fuelPerKm : 0;
+            let est = false;
+            if (!fuelPerKm) {
+                const hist = V.calcRange(vid, '', '');
+                if (hist && hist.ok && hist.fuelPerKm > 0) {
+                    fuelPerKm = hist.fuelPerKm;
+                    est = true;
+                }
+            }
+            if (!fuelPerKm) return null;
+
+            return { saved: r.km * fuelPerKm - actual, est: est };
+        }
+
+        function renderSavingCard() {
+            const card = document.getElementById('saveCard');
+            if (!card) return;
+            const info = calcMonthSaving(currentYear, currentMonth);
+            if (!info) {
+                card.style.display = 'none';
+                return;
+            }
+            card.style.display = '';
+
+            const amt = document.getElementById('saveAmount');
+            const det = document.getElementById('saveDetail');
+            const foot = document.getElementById('saveFoot');
+            const bar = document.getElementById('saveBarFill');
+
+            if (info.saved > 0.005) {
+                amt.textContent = formatAmount(info.saved);
+                amt.classList.remove('zero');
+            } else {
+                amt.textContent = '¥0.00';
+                amt.classList.add('zero');
+            }
+
+            det.textContent =
+                '如果全烧油 ' + formatAmount(info.fullOil) +
+                ' · 实际花 ' + formatAmount(info.actual) +
+                (info.est ? '（油基准按历史均值估算）' : '');
+
+            const pct = Math.round(info.evRatio * 100);
+            foot.textContent =
+                info.evKm > 0
+                    ? '充电跑了 ' + Math.round(info.evKm) + ' km，占 ' + pct + '%'
+                    : '这个月基本都在烧油';
+            if (bar) bar.style.width = Math.min(100, Math.max(0, pct)) + '%';
+        }
+
+        function renderAnnualSaving() {
+            const el = document.getElementById('annualSaving');
+            if (!el) return;
+            const info = calcYearSaving(annualYear);
+            if (!info || info.saved <= 0.005) {
+                el.style.display = 'none';
+                return;
+            }
+            el.style.display = '';
+            el.textContent = '💡 今年靠充电省下 ' + formatAmount(info.saved) + (info.est ? '（估算）' : '');
+        }
+
+        /** 金额 / 备注快捷胶囊：从自己的历史里取最常用的几个 */
+        function renderQuickPicks() {
+            const box = document.getElementById('quickAmounts');
+            const noteBox = document.getElementById('quickNotes');
+            if (!box) return;
+            const V = window.Vehicles;
+            const vid = V && V.currentVehicleId ? V.currentVehicleId() : '';
+            const list = DB.visibleRecords().filter((r) => {
+                if (r.type !== currentType) return false;
+                if (!vid) return true;
+                return V.resolveVehicleId(r) === vid;
+            });
+
+            const counts = new Map();
+            list.forEach((r) => {
+                const a = Math.round((Number(r.amount) || 0) * 100) / 100;
+                if (a > 0) counts.set(a, (counts.get(a) || 0) + 1);
+            });
+            const top = [...counts.entries()]
+                .sort((a, b) => b[1] - a[1] || b[0] - a[0])
+                .slice(0, 3)
+                .map((x) => x[0]);
+            [50, 100, 200].forEach((d) => {
+                if (top.length < 3 && top.indexOf(d) < 0) top.push(d);
+            });
+
+            const sorted = list.slice().sort((a, b) => (b.createTime || 0) - (a.createTime || 0));
+            const lastRec = sorted[0];
+
+            let out = top.map((a) => '<button type="button" class="qchip" data-amount="' + a + '">¥' + a + '</button>').join('');
+            if (lastRec) {
+                const la = Math.round((Number(lastRec.amount) || 0) * 100) / 100;
+                out += '<button type="button" class="qchip last" data-amount="' + la + '">上次 ¥' + la + '</button>';
+            }
+            box.innerHTML = out;
+            box.querySelectorAll('.qchip').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    inputAmount.value = btn.dataset.amount;
+                    inputAmount.focus();
+                });
+            });
+
+            if (noteBox) {
+                const notes = [];
+                sorted.forEach((r) => {
+                    const t = (r.note || '').trim();
+                    if (t && notes.indexOf(t) < 0 && notes.length < 3) notes.push(t);
+                });
+                noteBox.innerHTML = notes
+                    .map((t) => '<button type="button" class="qchip note" data-note="' + escText(t) + '">' + escText(t) + '</button>')
+                    .join('');
+                noteBox.querySelectorAll('.qchip').forEach((btn) => {
+                    btn.addEventListener('click', () => {
+                        inputNote.value = btn.dataset.note;
+                        noteBox.style.display = 'none';
+                    });
+                });
+            }
+        }
+
+        /** 拼一份月度小结的数据行 */
+        function buildMonthReport(y, m) {
+            const sum = calcMonthSummary(y, m);
+            if (!sum || !sum.count) return null;
+
+            const rows = [];
+            rows.push(['总花费', formatAmount(sum.total)]);
+            rows.push(['记账笔数', sum.count + ' 条']);
+
+            const pm = m === 0 ? 11 : m - 1;
+            const py = m === 0 ? y - 1 : y;
+            const prev = calcMonthSummary(py, pm);
+            if (prev && prev.count) {
+                const diff = sum.total - prev.total;
+                if (Math.abs(diff) <= 0.005) {
+                    rows.push(['比 ' + (pm + 1) + ' 月', '基本持平']);
+                } else {
+                    rows.push(['比 ' + (pm + 1) + ' 月', (diff > 0 ? '↑ ' : '↓ ') + formatAmount(Math.abs(diff))]);
+                }
+            }
+
+            const V = window.Vehicles;
+            const vid = V && V.currentVehicleId ? V.currentVehicleId() : '';
+            if (vid) {
+                const r = V.calcRange(vid, monthFirst(y, m), monthLast(y, m));
+                if (r && r.ok) {
+                    rows.push(['行驶里程', Math.round(r.km) + ' km']);
+                    rows.push(['每公里', formatAmount(r.perKm)]);
+                }
+                const sv = calcMonthSaving(y, m);
+                if (sv && sv.saved > 0.005) rows.push(['充电省下', formatAmount(sv.saved)]);
+            }
+            return rows;
+        }
+
+        function showReport(y, m, rows) {
+            const screen = document.getElementById('reportScreen');
+            if (!screen) return;
+            document.getElementById('reportTitle').textContent = y + '年' + (m + 1) + '月小结';
+            document.getElementById('reportBody').innerHTML = rows
+                .map((r) => '<div class="rep-row"><span class="rep-k">' + escText(r[0]) + '</span><span class="rep-v">' + escText(r[1]) + '</span></div>')
+                .join('');
+            screen.classList.remove('hidden');
+        }
+
+        /** 每月首次打开弹一次上月小结 */
+        function maybeShowMonthlyReport() {
+            const now = new Date();
+            let y = now.getFullYear();
+            let m = now.getMonth() - 1;
+            if (m < 0) { m = 11; y -= 1; }
+
+            const key = y + '-' + pad2(m + 1);
+            const storeKey = (window.DB && DB.key ? DB.key() : 'guest') + '_report';
+            let shown = '';
+            try { shown = localStorage.getItem(storeKey) || ''; } catch (e) { /* 忽略 */ }
+            if (shown === key) return;
+            try { localStorage.setItem(storeKey, key); } catch (e) { /* 忽略 */ }
+
+            const rows = buildMonthReport(y, m);
+            if (rows) showReport(y, m, rows);
+        }
+
+        /** 账号面板手动查看（从最近有数据的月份往前找） */
+        function openReportManual() {
+            const now = new Date();
+            let y = now.getFullYear();
+            let m = now.getMonth() - 1;
+            if (m < 0) { m = 11; y -= 1; }
+            let rows = null;
+            let yy = y;
+            let mm = m;
+            for (let i = 0; i < 12 && !rows; i++) {
+                rows = buildMonthReport(yy, mm);
+                if (!rows) {
+                    mm -= 1;
+                    if (mm < 0) { mm = 11; yy -= 1; }
+                }
+            }
+            if (!rows) { showToast('还没有可以看的小结', 1800); return; }
+            showReport(yy, mm, rows);
+        }
+
         function renderMonthlyView() {
             renderMonthlySummary();
+            renderSavingCard();
             renderMonthlyCalendar();
             renderMonthlyChart();
         }
@@ -3796,6 +4209,9 @@
             if (window.Vehicles) window.Vehicles.renderVehicleUI();
             if (window.Vehicles && window.Vehicles.refreshConflictUI) {
                 try { window.Vehicles.refreshConflictUI(); } catch (e) { /* 忽略 */ }
+            }
+            if (typeof renderQuickPicks === 'function') {
+                try { renderQuickPicks(); } catch (e) { /* 忽略 */ }
             }
             if (viewMode === 'monthly') {
                 renderMonthlyView();
@@ -4055,6 +4471,7 @@
             annualYear = d.getFullYear();
             updateTypeToggle('electric');
             switchView('monthly');
+            setTimeout(maybeShowMonthlyReport, 1200);
             initEvents();
             if (records.length === 0) {
                 setTimeout(() => showToast('👋 点击右下角 + 开始记录', 2000), 300);
@@ -4093,6 +4510,42 @@
             });
             const c = document.getElementById('changelogClose');
             if (c) c.addEventListener('click', close);
+        }
+
+        // 备注框聚焦 / 点击时浮出历史备注
+        if (inputNote) {
+            const showNotes = () => {
+                const nb = document.getElementById('quickNotes');
+                if (nb && nb.children.length) nb.style.display = '';
+            };
+            inputNote.addEventListener('focus', showNotes);
+            inputNote.addEventListener('click', showNotes);
+            inputNote.addEventListener('touchstart', showNotes, { passive: true });
+            inputNote.addEventListener('blur', () => {
+                setTimeout(() => {
+                    const nb = document.getElementById('quickNotes');
+                    if (nb) nb.style.display = 'none';
+                }, 180);
+            });
+        }
+        // 切换充电/加油时刷新快捷金额
+        if (typeToggle) {
+            typeToggle.addEventListener('click', () => setTimeout(() => {
+                if (typeof renderQuickPicks === 'function') renderQuickPicks();
+            }, 0));
+        }
+        const reportCloseBtn = document.getElementById('reportClose');
+        if (reportCloseBtn) {
+            reportCloseBtn.addEventListener('click', () => {
+                document.getElementById('reportScreen').classList.add('hidden');
+            });
+        }
+        const acctReportRow = document.getElementById('acctReportRow');
+        if (acctReportRow) {
+            acctReportRow.addEventListener('click', () => {
+                if (window.__closeAccount) window.__closeAccount();
+                openReportManual();
+            });
         }
 
         const pickCloseBtn = document.getElementById('pickClose');

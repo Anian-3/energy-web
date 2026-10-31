@@ -721,6 +721,12 @@
     }
 
     // ───────────────────────── 每公里花费 ─────────────────────────
+    function todayStr() {
+        const d = new Date();
+        const p = (n) => String(n).padStart(2, '0');
+        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+    }
+
     /** 两个 YYYY-MM-DD 相差的天数（b − a） */
     function daysBetween(a, b) {
         const t1 = new Date(String(a) + 'T00:00:00').getTime();
@@ -791,6 +797,7 @@
         const out = {
             ok: false, km: 0, total: 0, electric: 0, gas: 0,
             perKm: null, evPerKm: null, fuelPerKm: null, note: '', mode: 'cash',
+            evKm: null, fuelKm: null,
             fromDate: '', fromKm: null, toDate: '', toKm: null, spendFrom: '',
         };
         if (!v) return out;
@@ -825,7 +832,9 @@
                     const evCost = er.reduce((s, x) => s + (Number(x.amount) || 0), 0);
                     out.electric = evCost;
                     out.evPerKm = evCost / evKm;
+                    out.evKm = evKm;
                     const fuelKm = totalKm - evKm;
+                    out.fuelKm = fuelKm > 0 ? fuelKm : null;
                     if (fuelKm > 0) out.fuelPerKm = totalCost / fuelKm;
                 }
             }
@@ -891,6 +900,8 @@
             if (bEv != null && lEv != null) {
                 const evKm = lEv - bEv;
                 const fuelKm = km - evKm;
+                out.evKm = evKm > 0 ? evKm : null;
+                out.fuelKm = fuelKm > 0 ? fuelKm : null;
                 if (evKm > 0) out.evPerKm = out.electric / evKm;
                 if (fuelKm > 0) out.fuelPerKm = out.gas / fuelKm;
             }
@@ -933,6 +944,7 @@
             hideSplits();
             byId('pkFoot').textContent = '「全部车辆」不计算每公里，请选择具体某辆车';
             byId('mileageBtn').style.display = 'none';
+            if (byId('pkRemind')) byId('pkRemind').style.display = 'none';
             return;
         }
 
@@ -943,6 +955,7 @@
             hideSplits();
             byId('pkFoot').textContent = '请先添加一辆车';
             byId('mileageBtn').style.display = 'none';
+            if (byId('pkRemind')) byId('pkRemind').style.display = 'none';
             return;
         }
 
@@ -979,6 +992,28 @@
             );
         } else if (monthR.note) {
             lines.push('本月：' + monthR.note);
+        }
+
+        // 里程催记：太久没记读数，每公里就不准了
+        const remind = byId('pkRemind');
+        if (remind) {
+            const list = odometerOf(v.id);
+            if (!list.length) {
+                remind.style.display = 'none';
+            } else {
+                const days = daysBetween(list[list.length - 1].date, todayStr());
+                if (days > 30) {
+                    remind.style.display = '';
+                    remind.className = 'pk-remind warn';
+                    remind.textContent = '⚠️ 距上次记里程 ' + days + ' 天，每公里数字会越来越不准';
+                } else if (days > 7) {
+                    remind.style.display = '';
+                    remind.className = 'pk-remind';
+                    remind.textContent = '距上次记里程 ' + days + ' 天，记得补一次读数';
+                } else {
+                    remind.style.display = 'none';
+                }
+            }
         }
 
         const foot = byId('pkFoot');
