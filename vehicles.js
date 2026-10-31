@@ -310,12 +310,15 @@
         fillVehicleForm();
         byId('vehicleSheet').classList.add('active');
         byId('vehicleOverlay').classList.add('active');
+        if (window.__ovEnter) window.__ovEnter();
     }
 
     function closeVehicleSheet() {
+        const wasOpen = byId('vehicleSheet').classList.contains('active');
         byId('vehicleSheet').classList.remove('active');
         byId('vehicleOverlay').classList.remove('active');
         editingVehicleId = '';
+        if (wasOpen && window.__ovLeave) window.__ovLeave();
     }
 
     function renderVehicleList() {
@@ -517,11 +520,14 @@
         renderConflictList();
         byId('conflictSheet').classList.add('active');
         byId('conflictOverlay').classList.add('active');
+        if (window.__ovEnter) window.__ovEnter();
     }
 
     function closeConflictSheet() {
+        const wasOpen = byId('conflictSheet').classList.contains('active');
         byId('conflictSheet').classList.remove('active');
         byId('conflictOverlay').classList.remove('active');
+        if (wasOpen && window.__ovLeave) window.__ovLeave();
     }
 
     function deleteVehicle(id) {
@@ -585,12 +591,15 @@
         paintAutoOdo();
         byId('mileageSheet').classList.add('active');
         byId('mileageOverlay').classList.add('active');
+        if (window.__ovEnter) window.__ovEnter();
         setTimeout(() => byId('odoTotal').focus(), 260);
     }
 
     function closeMileageSheet() {
+        const wasOpen = byId('mileageSheet').classList.contains('active');
         byId('mileageSheet').classList.remove('active');
         byId('mileageOverlay').classList.remove('active');
+        if (wasOpen && window.__ovLeave) window.__ovLeave();
     }
 
     function renderMileageList() {

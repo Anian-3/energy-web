@@ -608,13 +608,16 @@
         renderAccountPanel();
         byId('acctPanel').classList.add('show');
         byId('acctMask').classList.add('show');
+        if (window.__ovEnter) window.__ovEnter();
     }
 
     function closeAccount() {
+        const wasOpen = byId('acctPanel').classList.contains('show');
         byId('acctPanel').classList.remove('show');
         byId('acctMask').classList.remove('show');
         byId('acctPwdBox').classList.remove('show');
         byId('pwdError').textContent = '';
+        if (wasOpen && window.__ovLeave) window.__ovLeave();
     }
 
     async function savePassword() {
@@ -647,28 +650,7 @@
     function wireAccountUI() {
         byId('acctBtn').addEventListener('click', openAccount);
 
-        // 使用说明（全屏页）
-        const openGuide = () => {
-            const body = byId('guideBody');
-            if (body && !body.innerHTML.trim()) {
-                body.innerHTML = window.GUIDE_HTML || '<p>说明内容缺失</p>';
-            }
-            byId('guideScreen').classList.remove('hidden');
-            if (body) body.scrollTop = 0;
-        };
-        const closeGuide = () => byId('guideScreen').classList.add('hidden');
-
-        const guideBtn = byId('guideBtn');
-        if (guideBtn) guideBtn.addEventListener('click', openGuide);
-        const acctGuide = byId('acctGuide');
-        if (acctGuide) {
-            acctGuide.addEventListener('click', () => {
-                closeAccount();
-                openGuide();
-            });
-        }
-        const guideClose = byId('guideClose');
-        if (guideClose) guideClose.addEventListener('click', closeGuide);
+        // 使用说明的开关统一在 index.html 内联脚本里绑定（window.__openGuide）
 
         // 页脚 / 登录页的版本号 → 更新日志，统一在 index.html 的内联脚本里绑定
         // （避免这个文件没更新时入口失效）
@@ -735,10 +717,11 @@
         byId('setupSave').addEventListener('click', saveSetup);
         byId('setupHelp').addEventListener('click', (e) => {
             e.preventDefault();
-            alert('在 Supabase 项目里：左下角 Settings（齿轮）→ API\n\n' +
-                '• Project URL 复制到上面第一栏\n' +
-                '• Project API keys 里选 anon public，复制到第二栏\n\n' +
-                '这两个是公开信息，放在网页里是安全的，数据由数据库的行级权限保护。');
+            if (typeof window.__openGuide === 'function') {
+                window.__openGuide('help');
+            } else {
+                alert('请打开页面使用说明，「一、开始前你需要准备什么」和「二、第一次使用：连接并登录」里有详细步骤。');
+            }
         });
     }
 

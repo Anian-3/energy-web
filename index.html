@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8" />
@@ -1565,6 +1565,38 @@
             color: #475569;
             cursor: pointer;
         }
+        .guide-more {
+            display: none;
+            flex: 0 0 auto;
+            margin: 0 16px 18px;
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            color: #fff;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .guide-screen.help-mode .guide-more { display: block; }
+
+        .acct-head { position: relative; }
+        .acct-close {
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 34px;
+            height: 34px;
+            border: none;
+            border-radius: 50%;
+            background: #f1f5f9;
+            color: #64748b;
+            font-size: 15px;
+            cursor: pointer;
+        }
+        .acct-close:active { background: #e2e8f0; }
+
         .guide-body {
             flex: 1 1 auto;
             overflow-y: auto;
@@ -1633,7 +1665,7 @@
             border-radius: 16px;
             padding: 14px 16px;
         }
-        .save-head { font-size: 12.5px; color: #0f766e; font-weight: 600; }
+        .save-head { font-size: 13px; color: #0f766e; font-weight: 600; }
         .save-amount {
             font-size: 27px;
             font-weight: 800;
@@ -1642,7 +1674,7 @@
             letter-spacing: -0.5px;
         }
         .save-amount.zero { color: #94a3b8; }
-        .save-detail { font-size: 11.5px; color: #64748b; margin-top: 4px; line-height: 1.55; }
+        .save-detail { font-size: 12.5px; color: #475569; margin-top: 5px; line-height: 1.55; }
         .save-bar { height: 6px; background: #d7eeea; border-radius: 6px; margin-top: 10px; overflow: hidden; }
         .save-bar-fill {
             height: 100%;
@@ -1650,7 +1682,8 @@
             border-radius: 6px;
             transition: width 0.3s;
         }
-        .save-foot { font-size: 11px; color: #64748b; margin-top: 6px; }
+        .save-formula { font-size: 12px; color: #64748b; margin-top: 8px; line-height: 1.5; }
+        .save-foot { font-size: 12.5px; color: #475569; margin-top: 4px; }
         .annual-saving { margin-top: 8px; font-size: 12.5px; color: #0f766e; font-weight: 600; }
 
         /* ===== 里程催记 ===== */
@@ -2143,6 +2176,16 @@
             <button class="guide-close" id="changelogClose" title="关闭">✕</button>
         </div>
         <div class="guide-body" id="changelogBody">
+            <h2>v1.6.0 · 2026-10-31</h2>
+            <ul>
+                <li>修复：本月没充电时，省钱卡仍会显示「省下 ¥xxx」，同时下方又写「基本都在烧油」，自相矛盾。
+                    现在没充电会明确显示 ¥0.00 和原因</li>
+                <li>省钱卡补上计算口径说明（如「按本月 1000 km × 油每公里 ¥0.71 估算」），并放大明细字号</li>
+                <li>首次配置页文案改为「请向开发者询问」；「获取帮助」会打开只含第一、二章的帮助页，底部可展开全文</li>
+                <li>支持浏览器返回键 / 全面屏手势返回：先关闭弹层，再离开页面</li>
+                <li>账号面板补上右上角关闭按钮（此前是唯一没有关闭入口的二级页面）</li>
+            </ul>
+
             <h2>v1.5.0 · 2026-10-31</h2>
             <ul>
                 <li>新增「靠充电省下多少钱」：本月多一张卡片，算出「如果全烧油要花 A，你实际花了 B，省了 C」；
@@ -2270,6 +2313,7 @@
             <button class="guide-close" id="guideClose" title="关闭">✕</button>
         </div>
         <div class="guide-body" id="guideBody"></div>
+        <button class="guide-more" id="guideMore">查看完整使用说明 ›</button>
     </div>
 
 <!-- ===== 登录 / 注册（新增） ===== -->
@@ -2319,6 +2363,7 @@
             <div class="acct-name" id="acctName">未登录</div>
             <div class="acct-meta" id="acctMeta">离线</div>
         </div>
+        <button class="acct-close" id="acctClose" title="关闭">✕</button>
     </div>
 
     <div class="acct-list">
@@ -2469,6 +2514,7 @@
         <div class="save-amount" id="saveAmount">¥0.00</div>
         <div class="save-detail" id="saveDetail"></div>
         <div class="save-bar"><div class="save-bar-fill" id="saveBarFill" style="width:0"></div></div>
+        <div class="save-formula" id="saveFormula"></div>
         <div class="save-foot" id="saveFoot"></div>
     </div>
 
@@ -2601,7 +2647,7 @@
         // ================================================================
         // 旧版本用过的键名，登录后可作为「旧数据」导入
         // 应用版本号：升级时只改这一处
-        const APP_VERSION = 'v1.5.0';
+        const APP_VERSION = 'v1.6.0';
 
         const LEGACY_KEY = 'hybrid_energy_records';
 
@@ -3900,6 +3946,7 @@
             overlay.classList.add('active');
             sheetOpen = true;
             document.body.style.overflow = 'hidden';
+            if (window.__ovEnter) window.__ovEnter();
         }
 
         function closeSheet() {
@@ -3940,6 +3987,8 @@
         const yearFirst = (y) => y + '-01-01';
         const yearLast = (y) => y + '-12-31';
 
+        const kmRatio = (a, b) => (b > 0 ? a / b : 0);
+
         /** 本月靠充电省下的钱（只有混动 / 增程车才有意义） */
         function calcMonthSaving(y, m) {
             const V = window.Vehicles;
@@ -3967,14 +4016,19 @@
             if (!fuelPerKm) return null;
 
             const fullOil = r.km * fuelPerKm;
+            const evKm = r.evKm || 0;
+            // 本月没充电（也没有纯电里程）时不构成"省钱"，否则会算出假的节省额
+            const noCharge = (sum.electric || 0) <= 0.005 || evKm <= 0;
             return {
-                saved: fullOil - actual,
+                saved: noCharge ? 0 : fullOil - actual,
                 fullOil: fullOil,
                 actual: actual,
                 km: r.km,
-                evKm: r.evKm || 0,
-                evRatio: (r.evKm || 0) / r.km,
+                evKm: evKm,
+                evRatio: kmRatio(evKm, r.km),
+                fuelPerKm: fuelPerKm,
                 est: est,
+                noCharge: noCharge,
             };
         }
 
@@ -4022,6 +4076,18 @@
             const foot = document.getElementById('saveFoot');
             const bar = document.getElementById('saveBarFill');
 
+            const formula = document.getElementById('saveFormula');
+
+            if (info.noCharge) {
+                amt.textContent = '¥0.00';
+                amt.classList.add('zero');
+                det.textContent = '这个月没充电，没有省钱';
+                if (formula) formula.textContent = '';
+                foot.textContent = '';
+                if (bar) bar.style.width = '0%';
+                return;
+            }
+
             if (info.saved > 0.005) {
                 amt.textContent = formatAmount(info.saved);
                 amt.classList.remove('zero');
@@ -4032,8 +4098,14 @@
 
             det.textContent =
                 '如果全烧油 ' + formatAmount(info.fullOil) +
-                ' · 实际花 ' + formatAmount(info.actual) +
-                (info.est ? '（油基准按历史均值估算）' : '');
+                ' · 实际花 ' + formatAmount(info.actual);
+
+            // 把口径摊开，免得"全烧油"这个数字来得莫名其妙
+            if (formula) {
+                formula.textContent =
+                    '按本月 ' + Math.round(info.km) + ' km × 油每公里 ¥' + (Math.round(info.fuelPerKm * 100) / 100).toFixed(2) +
+                    ' 估算' + (info.est ? '（油基准取自历史均值）' : '');
+            }
 
             const pct = Math.round(info.evRatio * 100);
             foot.textContent =
@@ -4158,6 +4230,7 @@
                 .map((r) => '<div class="rep-row"><span class="rep-k">' + escText(r[0]) + '</span><span class="rep-v">' + escText(r[1]) + '</span></div>')
                 .join('');
             screen.classList.remove('hidden');
+            if (window.__ovEnter) window.__ovEnter();
         }
 
         /** 每月首次打开弹一次上月小结 */
@@ -4361,6 +4434,7 @@
             });
             document.getElementById('pickOverlay').classList.add('active');
             document.getElementById('pickSheet').classList.add('active');
+            if (window.__ovEnter) window.__ovEnter();
         }
 
         function closeVehiclePick() {
@@ -4538,6 +4612,7 @@
         if (reportCloseBtn) {
             reportCloseBtn.addEventListener('click', () => {
                 document.getElementById('reportScreen').classList.add('hidden');
+                if (window.__ovLeave) window.__ovLeave();
             });
         }
         const acctReportRow = document.getElementById('acctReportRow');
@@ -4545,6 +4620,13 @@
             acctReportRow.addEventListener('click', () => {
                 if (window.__closeAccount) window.__closeAccount();
                 openReportManual();
+            });
+        }
+
+        const acctCloseBtn = document.getElementById('acctClose');
+        if (acctCloseBtn) {
+            acctCloseBtn.addEventListener('click', () => {
+                if (window.__closeAccount) window.__closeAccount();
             });
         }
 
@@ -4564,6 +4646,104 @@
             });
         }
 
+        // ── 说明页：完整 / 帮助（只显示一、二两章） ──
+        function setGuideMode(mode) {
+            const screen = document.getElementById('guideScreen');
+            const body = document.getElementById('guideBody');
+            if (!screen || !body) return;
+            if (!body.innerHTML.trim()) body.innerHTML = window.GUIDE_HTML || '<p>说明内容缺失</p>';
+            const kids = Array.from(body.children);
+            if (mode === 'help') {
+                screen.classList.add('help-mode');
+                let on = false;
+                kids.forEach((el) => {
+                    const t = (el.textContent || '').trim();
+                    const isH2 = el.tagName === 'H2';
+                    if (isH2 && /^一、/.test(t)) on = true;
+                    else if (isH2 && /^三、/.test(t)) on = false;
+                    el.style.display = on ? '' : 'none';
+                });
+            } else {
+                screen.classList.remove('help-mode');
+                kids.forEach((el) => { el.style.display = ''; });
+            }
+        }
+
+        function openGuideScreen(mode) {
+            const screen = document.getElementById('guideScreen');
+            if (!screen) return;
+            setGuideMode(mode === 'help' ? 'help' : 'full');
+            screen.classList.remove('hidden');
+            const body = document.getElementById('guideBody');
+            if (body) body.scrollTop = 0;
+            if (window.__ovEnter) window.__ovEnter();
+        }
+
+        function closeGuideScreen() {
+            const screen = document.getElementById('guideScreen');
+            if (!screen) return;
+            screen.classList.add('hidden');
+            if (window.__ovLeave) window.__ovLeave();
+        }
+        window.__openGuide = openGuideScreen;
+
+        const guideBtnEl = document.getElementById('guideBtn');
+        if (guideBtnEl) guideBtnEl.addEventListener('click', () => openGuideScreen('full'));
+        const acctGuideEl = document.getElementById('acctGuide');
+        if (acctGuideEl) {
+            acctGuideEl.addEventListener('click', () => {
+                if (window.__closeAccount) window.__closeAccount();
+                openGuideScreen('full');
+            });
+        }
+        const guideCloseEl = document.getElementById('guideClose');
+        if (guideCloseEl) guideCloseEl.addEventListener('click', closeGuideScreen);
+        const guideMoreEl = document.getElementById('guideMore');
+        if (guideMoreEl) {
+            guideMoreEl.addEventListener('click', () => {
+                setGuideMode('full');
+                const body = document.getElementById('guideBody');
+                if (body) body.scrollTop = 0;
+            });
+        }
+
+        // ── 浏览器返回键 / 手势：先关弹层，再离开页面 ──
+        let ovDepth = 0;
+        window.__ovEnter = function () {
+            if (ovDepth === 0) {
+                try { history.pushState({ ov: 1 }, ''); } catch (e) { /* 忽略 */ }
+            }
+            ovDepth++;
+        };
+        window.__ovLeave = function () {
+            if (ovDepth === 0) return;
+            ovDepth--;
+            if (ovDepth === 0) {
+                try { history.back(); } catch (e) { /* 忽略 */ }
+            }
+        };
+        function closeAllOverlays() {
+            try { if (typeof closeSheet === 'function') closeSheet(); } catch (e) { /* 忽略 */ }
+            try { if (window.__closeAccount) window.__closeAccount(); } catch (e) { /* 忽略 */ }
+            ['vehicleSheet', 'mileageSheet', 'conflictSheet', 'pickSheet'].forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) el.classList.remove('active');
+            });
+            ['vehicleOverlay', 'mileageOverlay', 'conflictOverlay', 'pickOverlay'].forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) el.classList.remove('active');
+            });
+            ['guideScreen', 'changelogScreen', 'reportScreen'].forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) el.classList.add('hidden');
+            });
+            ovDepth = 0;
+        }
+        window.addEventListener('popstate', function () {
+            if (ovDepth === 0) return; // 是我们自己 history.back() 触发的那次
+            closeAllOverlays();
+        });
+
         document.addEventListener('DOMContentLoaded', function () {
             paintVersion();
             wireChangelog();
@@ -4580,7 +4760,7 @@
         <div class="login-card">
             <div class="login-logo">☁️</div>
             <div class="login-title">连接你的数据库</div>
-            <div class="login-sub">第一次使用要填两个值<br />都来自你自己的 Supabase 项目</div>
+            <div class="login-sub">第一次使用要填两个值<br />请向开发者询问</div>
 
             <div class="field">
                 <label for="setupUrl">项目地址 Project URL</label>
@@ -4595,7 +4775,7 @@
             <button class="login-submit" id="setupSave">连接并保存</button>
 
             <div class="login-foot">
-                不知道填什么？<a href="#" id="setupHelp" style="color:#3b82f6;text-decoration:none;">点这里看在哪找</a><br />
+                不知道填什么？<a href="#" id="setupHelp" style="color:#3b82f6;text-decoration:none;">点这里获取帮助</a><br />
                 这两个值只存在本机浏览器里，换设备需要再填一次
             </div>
         </div>
