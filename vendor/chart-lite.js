@@ -10,12 +10,28 @@
   const FONT = '10px -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif';
   const FONT_LEGEND = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif';
 
-  function niceCeil(v) {
-    if (!isFinite(v) || v <= 0) return 1;
-    const exp = Math.pow(10, Math.floor(Math.log10(v)));
-    const f = v / exp;
-    const nice = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
-    return nice * exp;
+  /**
+   * 纵轴自适应：从 1 / 2 / 2.5 / 5 × 10^n 里挑最小的一个刻度间隔，
+   * 使「上限 ÷ 间隔」落在 3~6 格之间。
+   * 例如最高 273 → 间隔 50、上限 300（6 格）；最高 359 → 间隔 100、上限 400（4 格）。
+   */
+  function pickYAxis(max) {
+    if (!isFinite(max) || max <= 0) return { yMax: 1, yStep: 0.25, yLines: 4 };
+    const pow10 = (e) => Math.pow(10, e);
+    for (let e = -3; e <= 9; e++) {
+      const base = pow10(e);
+      for (const n of [1, 2, 2.5, 5]) {
+        const step = n * base;
+        const lines = Math.ceil(max / step);
+        if (lines >= 3 && lines <= 6) {
+          return { yMax: step * lines, yStep: step, yLines: lines };
+        }
+      }
+    }
+    // 兜底：取最接近的整数量级
+    const step = pow10(Math.floor(Math.log10(max)));
+    const lines = Math.max(3, Math.ceil(max / step));
+    return { yMax: step * lines, yStep: step, yLines: lines };
   }
 
   function withAlpha(color, alpha) {
@@ -115,7 +131,8 @@
           if (n > maxVal) maxVal = n;
         }
       }
-      const yMax = niceCeil(maxVal);
+      const yAxis = pickYAxis(maxVal);
+      const yMax = yAxis.yMax;
       const padL = 34;
       const padR = 8;
       const padB = 18;
@@ -134,7 +151,10 @@
       // x 轴标签抽样
       const xTickStep = Math.max(1, Math.ceil(n / maxTicks));
 
-      return { isBar, labels, datasets, yMax, plot, band, n, showLegend, legendH, xTickStep };
+      return {
+        isBar, labels, datasets, yMax, yStep: yAxis.yStep, yLines: yAxis.yLines,
+        plot, band, n, showLegend, legendH, xTickStep,
+      };
     }
 
     _xOf(L, i, mid = true) {
@@ -175,11 +195,11 @@
 
     _drawAxes(ctx, L, w, h) {
       const { plot, yMax, labels, xTickStep } = L;
+      const steps = L.yLines || 4;
       ctx.font = FONT;
       ctx.textBaseline = 'middle';
       ctx.textAlign = 'right';
 
-      const steps = 4;
       for (let i = 0; i <= steps; i++) {
         const val = (yMax / steps) * i;
         const y = Math.round(plot.bottom - (i / steps) * plot.height) + 0.5;
@@ -379,6 +399,7 @@
     }
   }
 
+  ChartLite.pickYAxis = pickYAxis;
   global.Chart = ChartLite;
   if (typeof module !== 'undefined' && module.exports) module.exports = ChartLite;
 })(typeof window !== 'undefined' ? window : globalThis);
