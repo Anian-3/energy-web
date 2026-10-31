@@ -1565,6 +1565,37 @@
             color: #475569;
             cursor: pointer;
         }
+        .guide-back {
+            border: none;
+            background: none;
+            color: #3b82f6;
+            font-family: inherit;
+            font-size: 14px;
+            cursor: pointer;
+            padding: 4px 2px;
+            flex: 0 0 auto;
+        }
+        .guide-back:active { opacity: 0.6; }
+        .report-head {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .report-back {
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            border: none;
+            background: none;
+            color: #3b82f6;
+            font-family: inherit;
+            font-size: 13px;
+            cursor: pointer;
+            padding: 4px 2px;
+        }
+
         .guide-more {
             display: none;
             flex: 0 0 auto;
@@ -2122,7 +2153,10 @@
     <!-- ===== 月度小结 ===== -->
     <div class="report-screen hidden" id="reportScreen">
         <div class="report-card">
-            <div class="report-head">📅 <span id="reportTitle">月度小结</span></div>
+            <div class="report-head">
+                <button class="report-back" id="reportBack">‹ 返回</button>
+                <span>📅 <span id="reportTitle">月度小结</span></span>
+            </div>
             <div class="report-body" id="reportBody"></div>
             <button class="report-close" id="reportClose">知道了</button>
         </div>
@@ -2172,10 +2206,19 @@
     <!-- ===== 更新日志（全屏） ===== -->
     <div class="guide-screen hidden" id="changelogScreen">
         <div class="guide-head">
+            <button class="guide-back" id="changelogBack">‹ 返回</button>
             <span class="guide-title">更新日志</span>
             <button class="guide-close" id="changelogClose" title="关闭">✕</button>
         </div>
         <div class="guide-body" id="changelogBody">
+            <h2>v1.6.2 · 2026-10-31</h2>
+            <ul>
+                <li>修复：鸿蒙上下拉返回时，「更新日志」会直接退回浏览器首页。原因是打开这个页面时没有向浏览器历史登记</li>
+                <li>修复：从账号面板打开「月度小结」时弹窗一闪就消失（关闭面板触发的回退把刚打开的小结一起关掉了）。
+                    现在关闭弹层会先等 60ms，期间若又打开新页面就取消回退</li>
+                <li>使用说明 / 更新日志 / 月度小结 左上角新增「‹ 返回」，手势返回不管用时可以直接点</li>
+            </ul>
+
             <h2>v1.6.1 · 2026-10-31</h2>
             <ul>
                 <li>修复：本月明明有电费（比如 ¥197），省钱卡却显示「这个月没充电」。
@@ -2318,6 +2361,7 @@
     <!-- ===== 使用说明（全屏） ===== -->
     <div class="guide-screen hidden" id="guideScreen">
         <div class="guide-head">
+            <button class="guide-back" id="guideBack">‹ 返回</button>
             <span class="guide-title">使用说明</span>
             <button class="guide-close" id="guideClose" title="关闭">✕</button>
         </div>
@@ -2656,7 +2700,7 @@
         // ================================================================
         // 旧版本用过的键名，登录后可作为「旧数据」导入
         // 应用版本号：升级时只改这一处
-        const APP_VERSION = 'v1.6.1';
+        const APP_VERSION = 'v1.6.2';
 
         const LEGACY_KEY = 'hybrid_energy_records';
 
@@ -4305,6 +4349,14 @@
                     if (mm < 0) { mm = 11; yy -= 1; }
                 }
             }
+            // 往前找不到就退回本月，保证这个入口总是能看到东西
+            if (!rows) {
+                const nowY = now.getFullYear();
+                const nowM = now.getMonth();
+                rows = buildMonthReport(nowY, nowM);
+                yy = nowY;
+                mm = nowM;
+            }
             if (!rows) { showToast('还没有可以看的小结', 1800); return; }
             showReport(yy, mm, rows);
         }
@@ -4606,11 +4658,15 @@
         function wireChangelog() {
             const open = () => {
                 const el = document.getElementById('changelogScreen');
-                if (el) el.classList.remove('hidden');
+                if (!el || !el.classList.contains('hidden')) return;
+                el.classList.remove('hidden');
+                if (window.__ovEnter) window.__ovEnter();
             };
             const close = () => {
                 const el = document.getElementById('changelogScreen');
-                if (el) el.classList.add('hidden');
+                if (!el || el.classList.contains('hidden')) return;
+                el.classList.add('hidden');
+                if (window.__ovLeave) window.__ovLeave();
             };
             ['verLink', 'loginVerLink'].forEach(function (id) {
                 const btn = document.getElementById(id);
@@ -4622,6 +4678,8 @@
             });
             const c = document.getElementById('changelogClose');
             if (c) c.addEventListener('click', close);
+            const backBtn = document.getElementById('changelogBack');
+            if (backBtn) backBtn.addEventListener('click', close);
         }
 
         // 备注框聚焦 / 点击时浮出历史备注
@@ -4648,6 +4706,13 @@
         }
         const reportCloseBtn = document.getElementById('reportClose');
         if (reportCloseBtn) {
+            const reportBackBtn = document.getElementById('reportBack');
+            if (reportBackBtn) {
+                reportBackBtn.addEventListener('click', () => {
+                    document.getElementById('reportScreen').classList.add('hidden');
+                    if (window.__ovLeave) window.__ovLeave();
+                });
+            }
             reportCloseBtn.addEventListener('click', () => {
                 document.getElementById('reportScreen').classList.add('hidden');
                 if (window.__ovLeave) window.__ovLeave();
@@ -4736,6 +4801,8 @@
         }
         const guideCloseEl = document.getElementById('guideClose');
         if (guideCloseEl) guideCloseEl.addEventListener('click', closeGuideScreen);
+        const guideBackEl = document.getElementById('guideBack');
+        if (guideBackEl) guideBackEl.addEventListener('click', closeGuideScreen);
         const guideMoreEl = document.getElementById('guideMore');
         if (guideMoreEl) {
             guideMoreEl.addEventListener('click', () => {
@@ -4747,7 +4814,15 @@
 
         // ── 浏览器返回键 / 手势：先关弹层，再离开页面 ──
         let ovDepth = 0;
+        let pendingBack = null;
+
         window.__ovEnter = function () {
+            // 上一个弹层刚关、回退还没执行就又打开了新弹层 → 取消那次回退
+            // （否则迟到的 back() 会把刚打开的弹层一起关掉，比如「账号面板 → 月度小结」）
+            if (pendingBack) {
+                clearTimeout(pendingBack);
+                pendingBack = null;
+            }
             if (ovDepth === 0) {
                 // 部分浏览器（例如鸿蒙的华为浏览器）对空 URL 的 pushState 兼容性差，
                 // 这里显式带上当前地址，失败再退回空 URL。
@@ -4759,11 +4834,16 @@
             }
             ovDepth++;
         };
+
         window.__ovLeave = function () {
             if (ovDepth === 0) return;
             ovDepth--;
             if (ovDepth === 0) {
-                try { history.back(); } catch (e) { /* 忽略 */ }
+                if (pendingBack) clearTimeout(pendingBack);
+                pendingBack = setTimeout(function () {
+                    pendingBack = null;
+                    try { history.back(); } catch (e) { /* 忽略 */ }
+                }, 60);
             }
         };
         function closeAllOverlays() {
