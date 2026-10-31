@@ -1688,6 +1688,43 @@
         }
         .guide-body th { background: #f1f5f9; font-weight: 600; white-space: nowrap; }
 
+        /* ===== 充电场景 ===== */
+        .site-row { display: flex; gap: 6px; margin-top: 8px; }
+        .site-row:empty { display: none; }
+        .site-chip {
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            color: #64748b;
+            border-radius: 14px;
+            padding: 5px 11px;
+            font-size: 12px;
+            font-family: inherit;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .site-chip.on {
+            border-color: #93c5fd;
+            background: #eff6ff;
+            color: #2563eb;
+            font-weight: 600;
+        }
+        .site-breakdown {
+            margin-top: 8px;
+            font-size: 11.5px;
+            color: #64748b;
+            line-height: 1.6;
+        }
+        .record-item .site-tag {
+            font-size: 11px;
+            color: #2563eb;
+            background: #eff6ff;
+            border-radius: 6px;
+            padding: 1px 6px;
+            flex-shrink: 0;
+        }
+        .vehicle-form .vf-pair { display: flex; gap: 8px; margin-top: 6px; }
+        .vehicle-form .vf-pair input { flex: 1 1 0; min-width: 0; }
+
         /* ===== 充电省钱账 ===== */
         .save-card {
             background: linear-gradient(135deg, #ecfdf5, #f0fdfa);
@@ -2131,6 +2168,14 @@
                 </div>
             </div>
             <div class="vf-hint" id="vehFillHint">每次加满：用「满箱法」算每公里，更准；定额加油：按实际花钱估算</div>
+            <div class="vf-row" id="vehCompareRow" style="display:none">
+                <span class="vf-label">对比油车（选填）</span>
+                <div class="vf-pair">
+                    <input class="note-input" id="vehL100" type="number" inputmode="decimal" placeholder="参考油耗 L/100km" />
+                    <input class="note-input" id="vehPrice" type="number" inputmode="decimal" placeholder="油价 元/L" />
+                </div>
+            </div>
+            <div class="vf-hint" id="vehCompareHint" style="display:none">填了这两项，首页会显示「本月比开油车省了多少」</div>
             <input class="note-input" id="vehStartOdo" type="number" inputmode="numeric" placeholder="初始里程 km（选填）" style="display:none" />
             <div class="vf-actions">
                 <button class="submit-btn" id="vehSubmit">添加</button>
@@ -2211,6 +2256,15 @@
             <button class="guide-close" id="changelogClose" title="关闭">✕</button>
         </div>
         <div class="guide-body" id="changelogBody">
+            <h2>v1.7.0 · 2026-10-31</h2>
+            <ul>
+                <li>纯电车也能看「省了多少」：在车辆编辑里填一个「参考油耗 + 油价」，首页就显示
+                    「本月比开油车省下 ¥X」。填一次长期有效，不填就不显示这张卡</li>
+                <li>充电场景：记账时可以标 🏠家充 / ⚡快充 / 🏢公司，月度汇总会显示
+                    「家充 ¥120（67%）· 快充 ¥60（33%）」，并记住上次的选择</li>
+                <li>注意：这两个功能需要先在 Supabase 跑一次升级脚本（upgrade-v170.sql）</li>
+            </ul>
+
             <h2>v1.6.2 · 2026-10-31</h2>
             <ul>
                 <li>修复：鸿蒙上下拉返回时，「更新日志」会直接退回浏览器首页。原因是打开这个页面时没有向浏览器历史登记</li>
@@ -2528,6 +2582,7 @@
                 </div>
             </div>
             <div class="record-count" id="recordCount">共 0 条记录</div>
+            <div class="site-breakdown" id="siteBreakdown" style="display:none"></div>
         </div>
         <div id="summaryAnnual" style="display:none;">
             <div class="row">
@@ -2565,7 +2620,7 @@
 
     <!-- ===== 充电省钱账 ===== -->
     <div class="save-card" id="saveCard" style="display:none">
-        <div class="save-head">💡 本月靠充电省下</div>
+        <div class="save-head" id="saveHead">💡 本月靠充电省下</div>
         <div class="save-amount" id="saveAmount">¥0.00</div>
         <div class="save-detail" id="saveDetail"></div>
         <div class="save-bar"><div class="save-bar-fill" id="saveBarFill" style="width:0"></div></div>
@@ -2687,6 +2742,11 @@
                     <input type="checkbox" id="usePoints" /> 🎫 积分
                 </label>
             </div>
+            <div class="site-row" id="siteRow">
+                <button type="button" class="site-chip" data-site="home">🏠 家充</button>
+                <button type="button" class="site-chip" data-site="fast">⚡ 快充</button>
+                <button type="button" class="site-chip" data-site="company">🏢 公司</button>
+            </div>
             <div class="quick-row" id="quickAmounts"></div>
             <div class="quick-row" id="quickNotes" style="display:none"></div>
             <div class="form-row row-note">
@@ -2702,7 +2762,7 @@
         // ================================================================
         // 旧版本用过的键名，登录后可作为「旧数据」导入
         // 应用版本号：升级时只改这一处
-        const APP_VERSION = 'v1.6.2';
+        const APP_VERSION = 'v1.7.0';
 
         const LEGACY_KEY = 'hybrid_energy_records';
 
@@ -2891,6 +2951,7 @@
                     note: r.note || '',
                     usePoints: !!r.usePoints,
                     vehicleId: r.vehicleId || (p && p.vehicleId) || vid || '',
+                    chargeSite: r.chargeSite || (p && p.chargeSite) || '',
                     createTime: r.createTime || (p && p.createTime) || now,
                     updatedAt: changed ? now : (p.updatedAt || now),
                     dirty: changed ? 1 : (p.dirty || 0),
@@ -3069,7 +3130,7 @@
             return years.map(y => ({ year: y, ...calcYearSummary(y) }));
         }
 
-        function addRecord(date, type, amount, note, usePoints, vehicleId) {
+        function addRecord(date, type, amount, note, usePoints, vehicleId, chargeSite) {
             if (!date || !type || amount == null || amount <= 0) {
                 showToast('请填写有效的金额');
                 return false;
@@ -3084,6 +3145,7 @@
                 usePoints: !!usePoints
             };
             if (vehicleId) record.vehicleId = vehicleId;
+            if (chargeSite) record.chargeSite = chargeSite;
             records.push(record);
             saveRecords(records);
             return true;
@@ -3463,6 +3525,33 @@
             electricTotal.textContent = formatAmount(electric);
             gasTotal.textContent = formatAmount(gas);
             recordCount.textContent = `共 ${count} 条记录`;
+
+            // 充电构成：只有标记过场景才显示
+            const box = document.getElementById('siteBreakdown');
+            if (box) {
+                const monthRecords = getRecordsForMonth(currentYear, currentMonth);
+                const sums = { home: 0, fast: 0, company: 0 };
+                let any = false;
+                monthRecords.forEach((r) => {
+                    if (r.type !== 'electric' || !r.chargeSite) return;
+                    if (sums[r.chargeSite] === undefined) return;
+                    sums[r.chargeSite] += Number(r.amount) || 0;
+                    any = true;
+                });
+                const totalCharged = sums.home + sums.fast + sums.company;
+                if (!any || totalCharged <= 0) {
+                    box.style.display = 'none';
+                } else {
+                    const parts = [];
+                    ['home', 'fast', 'company'].forEach((k) => {
+                        if (sums[k] <= 0) return;
+                        const pct = Math.round((sums[k] / totalCharged) * 100);
+                        parts.push(SITE_LABELS[k] + ' ' + formatAmount(sums[k]) + '（' + pct + '%）');
+                    });
+                    box.style.display = '';
+                    box.innerHTML = '充电构成：' + parts.join(' · ');
+                }
+            }
         }
 
         function renderMonthlyCalendar() {
@@ -3915,10 +4004,13 @@
                     const pointsMark = r.usePoints ? `<span class="points-mark">🎫积分</span>` : '';
                     // 「全部车辆」视图下，标出这笔属于哪辆车
                     const vehMark = showVehTag(r) ? `<span class="veh-tag">${escText(vehNameOf(r))}</span>` : '';
+                    const siteMark = r.chargeSite && SITE_LABELS[r.chargeSite]
+                        ? `<span class="site-tag">${SITE_LABELS[r.chargeSite]}</span>` : '';
                     html += `
                                 <div class="record-item" data-id="${r.id}">
                                     <div class="left">
                                         <span class="type-badge ${typeCls}">${typeLabel}</span>
+                                        ${siteMark}
                                         ${vehMark}
                                         <span class="info-text">${note}</span>
                                     </div>
@@ -3997,6 +4089,8 @@
             selectedDate = dateStr;
             renderSheet(dateStr);
             if (typeof renderQuickPicks === 'function') renderQuickPicks();
+            currentSite = lastSite();
+            paintSiteRow();
             bottomSheet.classList.add('active');
             overlay.classList.add('active');
             sheetOpen = true;
@@ -4039,6 +4133,34 @@
         //  v1.5.0：省钱账 / 月度小结 / 记账快捷
         // ================================================================
         const pad2 = (n) => String(n).padStart(2, '0');
+        // ── 充电场景：🏠家充 / ⚡快充 / 🏢公司 ──
+        const SITE_LABELS = { home: '🏠 家充', fast: '⚡ 快充', company: '🏢 公司' };
+        let currentSite = '';
+
+        function siteStoreKey() {
+            return (window.DB && DB.key ? DB.key() : 'guest') + '_site';
+        }
+        function lastSite() {
+            try { return localStorage.getItem(siteStoreKey()) || ''; } catch (e) { return ''; }
+        }
+        function saveLastSite(v) {
+            try { localStorage.setItem(siteStoreKey(), v || ''); } catch (e) { /* 忽略 */ }
+        }
+        function paintSiteRow() {
+            const row = document.getElementById('siteRow');
+            if (!row) return;
+            const show = currentType === 'electric';
+            row.style.display = show ? '' : 'none';
+            row.querySelectorAll('.site-chip').forEach((btn) => {
+                btn.classList.toggle('on', show && btn.dataset.site === currentSite);
+            });
+        }
+        function setSite(site) {
+            currentSite = site || '';
+            saveLastSite(currentSite);
+            paintSiteRow();
+        }
+
         const monthFirst = (y, m) => y + '-' + pad2(m + 1) + '-01';
         const monthLast = (y, m) => y + '-' + pad2(m + 1) + '-' + pad2(new Date(y, m + 1, 0).getDate());
         const yearFirst = (y) => y + '-01-01';
@@ -4053,7 +4175,41 @@
             const vid = V.currentVehicleId();
             if (!vid) return null;
             const v = V.vehicleById(vid);
-            if (!v || v.type !== 'hybrid') return null;
+            if (!v) return null;
+
+            // 纯电车：用「参考油耗 + 油价」换算出开油车的成本
+            if (v.type === 'ev') {
+                const sumEv = calcMonthSummary(y, m);
+                const evCostEv = sumEv.electric || 0;
+                const rEv = V.calcRange(vid, monthFirst(y, m), monthLast(y, m));
+                const l100 = Number(v.compareConsumption) || 0;
+                const price = Number(v.fuelPrice) || 0;
+                const kmEv = rEv && rEv.ok ? rEv.km : 0;
+                if (l100 <= 0 || price <= 0 || !(kmEv > 0)) return null;
+                if (evCostEv <= 0.005) {
+                    return {
+                        saved: 0, fullOil: 0, actual: 0, km: kmEv,
+                        evKm: 0, evRatio: 0, fuelPerKm: 0, est: false, noCharge: true, isEv: true,
+                    };
+                }
+                const fullOilEv = (kmEv / 100) * l100 * price;
+                return {
+                    saved: fullOilEv - evCostEv,
+                    fullOil: fullOilEv,
+                    actual: evCostEv,
+                    km: kmEv,
+                    evKm: kmEv,
+                    evRatio: 1,
+                    fuelPerKm: fullOilEv / kmEv,
+                    est: false,
+                    noCharge: false,
+                    isEv: true,
+                    l100: l100,
+                    price: price,
+                };
+            }
+
+            if (v.type !== 'hybrid') return null;
 
             const r = V.calcRange(vid, monthFirst(y, m), monthLast(y, m));
             if (!r || !r.ok || !(r.km > 0)) return null;
@@ -4161,6 +4317,7 @@
             const det = document.getElementById('saveDetail');
             const foot = document.getElementById('saveFoot');
             const bar = document.getElementById('saveBarFill');
+            const head = document.getElementById('saveHead');
 
             const formula = document.getElementById('saveFormula');
 
@@ -4183,21 +4340,24 @@
             }
 
             det.textContent =
-                '如果全烧油 ' + formatAmount(info.fullOil) +
+                (info.isEv ? '如果开油车 ' : '如果全烧油 ') + formatAmount(info.fullOil) +
                 ' · 实际花 ' + formatAmount(info.actual);
 
             // 把口径摊开，免得"全烧油"这个数字来得莫名其妙
             if (formula) {
-                formula.textContent =
-                    '按本月 ' + Math.round(info.km) + ' km × 油每公里 ¥' + (Math.round(info.fuelPerKm * 100) / 100).toFixed(2) +
-                    ' 估算' + (info.est ? '（油基准取自历史均值）' : '');
+                formula.textContent = info.isEv
+                    ? '按参考油耗 ' + info.l100 + ' L/100km × 油价 ¥' + info.price + '/L 估算'
+                    : '按本月 ' + Math.round(info.km) + ' km × 油每公里 ¥' + (Math.round(info.fuelPerKm * 100) / 100).toFixed(2) +
+                        ' 估算' + (info.est ? '（油基准取自历史均值）' : '');
             }
 
+            if (head) head.textContent = info.isEv ? '💡 本月比开油车省下' : '💡 本月靠充电省下';
             const pct = Math.round(info.evRatio * 100);
-            foot.textContent =
-                info.evKm > 0
+            foot.textContent = info.isEv
+                ? '本月 ' + Math.round(info.km) + ' km 全部用充电'
+                : (info.evKm > 0
                     ? '充电跑了 ' + Math.round(info.evKm) + ' km，占 ' + pct + '%'
-                    : '这个月基本都在烧油';
+                    : '这个月基本都在烧油');
             if (bar) bar.style.width = Math.min(100, Math.max(0, pct)) + '%';
         }
 
@@ -4483,7 +4643,8 @@
 
         /** 真正写入一笔记录（选定车辆后调用） */
         function commitRecord(date, type, amount, note, usePoints, vehicleId) {
-            if (!addRecord(date, type, amount, note, usePoints, vehicleId)) return;
+            const site = type === 'electric' ? currentSite : '';
+            if (!addRecord(date, type, amount, note, usePoints, vehicleId, site)) return;
             showToast(`✅ 已记录 ${type === 'electric' ? '充电' : '加油'} ${formatAmount(amount)}${usePoints ? ' 🎫积分' : ''}`);
             renderAll();
             if (sheetOpen && selectedDate === date) {
@@ -4708,6 +4869,7 @@
         if (typeToggle) {
             typeToggle.addEventListener('click', () => setTimeout(() => {
                 if (typeof renderQuickPicks === 'function') renderQuickPicks();
+                paintSiteRow();
             }, 0));
         }
         const reportCloseBtn = document.getElementById('reportClose');
@@ -4729,6 +4891,16 @@
             acctReportRow.addEventListener('click', () => {
                 if (window.__closeAccount) window.__closeAccount();
                 openReportManual();
+            });
+        }
+
+        const siteRowEl = document.getElementById('siteRow');
+        if (siteRowEl) {
+            siteRowEl.addEventListener('click', (e) => {
+                const chip = e.target.closest('.site-chip');
+                if (!chip) return;
+                const site = chip.dataset.site;
+                setSite(currentSite === site ? '' : site);
             });
         }
 

@@ -209,7 +209,7 @@
         {
             name: 'vehicles',
             path: '/rest/v1/vehicles',
-            cols: 'id,name,type,note,start_odometer,fill_mode,created_at,client_ts,deleted',
+            cols: 'id,name,type,note,start_odometer,fill_mode,compare_consumption,fuel_price,created_at,client_ts,deleted',
             toRow(v) {
                 return {
                     id: v.id,
@@ -218,6 +218,8 @@
                     note: v.note || '',
                     start_odometer: Math.round(Number(v.startOdometer) || 0),
                     fill_mode: v.fillMode === 'fixed' ? 'fixed' : 'full',
+                    compare_consumption: Number(v.compareConsumption) || 0,
+                    fuel_price: Number(v.fuelPrice) || 0,
                     created_at: Number(v.createdAt) || 0,
                     client_ts: Number(v.updatedAt) || 0,
                     deleted: !!v.deleted,
@@ -240,7 +242,7 @@
         {
             name: 'records',
             path: '/rest/v1/records',
-            cols: 'id,date,type,amount,note,use_points,create_time,client_ts,deleted,vehicle_id',
+            cols: 'id,date,type,amount,note,use_points,create_time,client_ts,deleted,vehicle_id,charge_site',
             toRow(r) {
                 return {
                     id: r.id,
@@ -253,6 +255,7 @@
                     client_ts: Number(r.updatedAt) || 0,
                     deleted: !!r.deleted,
                     vehicle_id: r.vehicleId || null,
+                    charge_site: r.chargeSite || '',
                 };
             },
             fromRow(o) {

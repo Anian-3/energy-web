@@ -363,6 +363,8 @@
         byId('vehStartOdo').value = v && v.startOdometer ? v.startOdometer : '';
         setVehicleType(v ? v.type : 'fuel');
         setFillMode(v ? (v.fillMode || 'full') : 'full');
+        if (byId('vehL100')) byId('vehL100').value = v && v.compareConsumption ? v.compareConsumption : '';
+        if (byId('vehPrice')) byId('vehPrice').value = v && v.fuelPrice ? v.fuelPrice : '';
         byId('vehSubmit').textContent = v ? '保存修改' : '添加';
         byId('vehCancel').style.display = v ? '' : 'none';
     }
@@ -378,6 +380,11 @@
         const show = type !== 'ev';
         if (row) row.style.display = show ? '' : 'none';
         if (hint) hint.style.display = show ? '' : 'none';
+        // 纯电车才需要「对比油车」这两个值
+        const cmpRow = byId('vehCompareRow');
+        const cmpHint = byId('vehCompareHint');
+        if (cmpRow) cmpRow.style.display = type === 'ev' ? '' : 'none';
+        if (cmpHint) cmpHint.style.display = type === 'ev' ? '' : 'none';
     }
 
     function setFillMode(mode) {
@@ -393,6 +400,8 @@
         const type = byId('vehicleForm').dataset.type || 'hybrid';
         const fillMode = byId('vehicleForm').dataset.fill === 'fixed' ? 'fixed' : 'full';
         const start = Number(byId('vehStartOdo').value) || 0;
+        const compareConsumption = Number(byId('vehL100') && byId('vehL100').value) || 0;
+        const fuelPrice = Number(byId('vehPrice') && byId('vehPrice').value) || 0;
         if (!name) { toast('请填写车辆名称'); return; }
 
         const all = DB.table('vehicles');
@@ -429,6 +438,8 @@
             existing.name = name;
             existing.type = type;
             existing.fillMode = fillMode;
+            existing.compareConsumption = compareConsumption;
+            existing.fuelPrice = fuelPrice;
             existing.startOdometer = start;
             existing.updatedAt = now;
             existing.dirty = 1;
@@ -438,6 +449,8 @@
             all.push({
                 id, name, type, note: '',
                 fillMode: fillMode,
+                compareConsumption: compareConsumption,
+                fuelPrice: fuelPrice,
                 startOdometer: start,
                 createdAt: now, updatedAt: now, dirty: 1, deleted: 0,
             });
