@@ -2176,6 +2176,15 @@
             <button class="guide-close" id="changelogClose" title="关闭">✕</button>
         </div>
         <div class="guide-body" id="changelogBody">
+            <h2>v1.6.1 · 2026-10-31</h2>
+            <ul>
+                <li>修复：本月明明有电费（比如 ¥197），省钱卡却显示「这个月没充电」。
+                    原因是判断条件误用了纯电里程——里程读数没填「纯电 / 燃油」拆分时会被误判。
+                    现在只看电费，并在缺少拆分时按历史比例估算纯电里程</li>
+                <li>鸿蒙端适配：打开弹层时改用更兼容的方式写入浏览器历史，返回手势关不掉时可用右上角 ✕</li>
+                <li>使用说明「装到手机桌面」新增鸿蒙步骤，按 鸿蒙 / 安卓 / iPhone 排列</li>
+            </ul>
+
             <h2>v1.6.0 · 2026-10-31</h2>
             <ul>
                 <li>修复：本月没充电时，省钱卡仍会显示「省下 ¥xxx」，同时下方又写「基本都在烧油」，自相矛盾。
@@ -2647,7 +2656,7 @@
         // ================================================================
         // 旧版本用过的键名，登录后可作为「旧数据」导入
         // 应用版本号：升级时只改这一处
-        const APP_VERSION = 'v1.6.0';
+        const APP_VERSION = 'v1.6.1';
 
         const LEGACY_KEY = 'hybrid_energy_records';
 
@@ -4002,33 +4011,62 @@
             if (!r || !r.ok || !(r.km > 0)) return null;
 
             const sum = calcMonthSummary(y, m);
-            const actual = (sum.electric || 0) + (sum.gas || 0);
+            const evCost = sum.electric || 0;
+            const gasCost = sum.gas || 0;
+            const actual = evCost + gasCost;
+            const km = r.km;
 
-            let fuelPerKm = r.fuelPerKm > 0 ? r.fuelPerKm : 0;
+            // 唯一判据是「这个月有没有花电费」。
+            // 不能用纯电里程判断：里程读数没填拆分时 evKm 会是 0，会误判成"没充电"。
+            if (evCost <= 0.005) {
+                return {
+                    saved: 0, fullOil: 0, actual: actual, km: km,
+                    evKm: 0, evRatio: 0, fuelPerKm: 0, est: false, noCharge: true,
+                };
+            }
+
+            let hist = null;
+            const history = () => {
+                if (!hist) hist = V.calcRange(vid, '', '');
+                return hist;
+            };
+
+            // 纯电里程：优先用读数拆分；缺失时按历史「纯电占比」估算
+            let evKm = r.evKm || 0;
+            let estEv = false;
+            if (!(evKm > 0)) {
+                const h = history();
+                if (h && h.ok && h.evKm > 0 && h.km > 0) {
+                    evKm = km * (h.evKm / h.km);
+                    estEv = true;
+                }
+            }
+            const fuelKm = Math.max(1, km - evKm);
+
+            // 油每公里：本月油费 ÷ 本月燃油里程；本月没加油就用历史均值
+            let fuelPerKm = 0;
             let est = false;
-            if (!fuelPerKm) {
-                const hist = V.calcRange(vid, '', '');
-                if (hist && hist.ok && hist.fuelPerKm > 0) {
-                    fuelPerKm = hist.fuelPerKm;
+            if (gasCost > 0 && fuelKm > 0) fuelPerKm = gasCost / fuelKm;
+            if (!(fuelPerKm > 0)) {
+                const h = history();
+                if (h && h.ok && h.fuelPerKm > 0) {
+                    fuelPerKm = h.fuelPerKm;
                     est = true;
                 }
             }
-            if (!fuelPerKm) return null;
+            if (!(fuelPerKm > 0)) return null;
 
-            const fullOil = r.km * fuelPerKm;
-            const evKm = r.evKm || 0;
-            // 本月没充电（也没有纯电里程）时不构成"省钱"，否则会算出假的节省额
-            const noCharge = (sum.electric || 0) <= 0.005 || evKm <= 0;
+            const fullOil = km * fuelPerKm;
             return {
-                saved: noCharge ? 0 : fullOil - actual,
+                saved: fullOil - actual,
                 fullOil: fullOil,
                 actual: actual,
-                km: r.km,
+                km: km,
                 evKm: evKm,
-                evRatio: kmRatio(evKm, r.km),
+                evRatio: kmRatio(evKm, km),
                 fuelPerKm: fuelPerKm,
-                est: est,
-                noCharge: noCharge,
+                est: est || estEv,
+                noCharge: false,
             };
         }
 
@@ -4711,7 +4749,13 @@
         let ovDepth = 0;
         window.__ovEnter = function () {
             if (ovDepth === 0) {
-                try { history.pushState({ ov: 1 }, ''); } catch (e) { /* 忽略 */ }
+                // 部分浏览器（例如鸿蒙的华为浏览器）对空 URL 的 pushState 兼容性差，
+                // 这里显式带上当前地址，失败再退回空 URL。
+                try {
+                    history.pushState({ ov: 1 }, '', location.href);
+                } catch (e) {
+                    try { history.pushState({ ov: 1 }, ''); } catch (e2) { /* 忽略 */ }
+                }
             }
             ovDepth++;
         };
@@ -4739,10 +4783,13 @@
             });
             ovDepth = 0;
         }
-        window.addEventListener('popstate', function () {
+        function onBackGesture() {
             if (ovDepth === 0) return; // 是我们自己 history.back() 触发的那次
             closeAllOverlays();
-        });
+        }
+        // 多数系统走 popstate；个别系统把返回表现为 hash 变化，一并接住
+        window.addEventListener('popstate', onBackGesture);
+        window.addEventListener('hashchange', onBackGesture);
 
         document.addEventListener('DOMContentLoaded', function () {
             paintVersion();
