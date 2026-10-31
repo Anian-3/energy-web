@@ -96,9 +96,12 @@
         SESSION.refresh = data.refresh_token || SESSION.refresh;
         SESSION.expiresAt = Date.now() + (Number(data.expires_in || 3600) * 1000);
         if (data.user) {
+            const meta = data.user.user_metadata || {};
             SESSION.user = {
                 id: data.user.id,
                 username: usernameFromEmail(data.user.email || ''),
+                // 账号名不区分大小写，但界面显示用户当初输入的原样
+                displayName: meta.display_name || usernameFromEmail(data.user.email || ''),
             };
         }
         localStorage.setItem(SESSION_KEY, JSON.stringify({
@@ -197,8 +200,9 @@
             return;
         }
         const u = SESSION.user;
-        byId('acctName').textContent = u.username;
-        byId('acctAvatar').textContent = String(u.username || 'U').slice(0, 1).toUpperCase();
+        const shown = u.displayName || u.username;
+        byId('acctName').textContent = shown;
+        byId('acctAvatar').textContent = String(shown || 'U').slice(0, 1).toUpperCase();
         byId('acctMeta').textContent = status.text;
         byId('acctLast').textContent = timeAgo(lastSyncAt);
         updateCount();
@@ -573,7 +577,8 @@
             if (loginMode === 'register') {
                 data = await sb('/auth/v1/signup', {
                     method: 'POST',
-                    body: { email, password },
+                    // display_name 保存用户输入的原样大小写，仅用于显示
+                    body: { email, password, data: { display_name: username } },
                     auth: false,
                 });
                 if (!data || !data.access_token) {
