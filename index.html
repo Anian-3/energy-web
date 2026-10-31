@@ -1196,6 +1196,9 @@
         .annual-scroll {
             padding-right: 0;
         }
+        /* 年度视图隐藏两张月度卡片 */
+        body.annual-mode #saveCard,
+        body.annual-mode #perkmCard { display: none !important; }
         .annual-scroll::-webkit-scrollbar {
             width: 4px;
         }
@@ -2256,6 +2259,11 @@
             <button class="guide-close" id="changelogClose" title="关闭">✕</button>
         </div>
         <div class="guide-body" id="changelogBody">
+            <h2>v1.7.3 · 2026-10-31</h2>
+            <ul>
+                <li>年度汇总隐藏月度卡片，只保留全年数据</li>
+            </ul>
+
             <h2>v1.7.2 · 2026-10-31</h2>
             <ul>
                 <li>优化年度汇总展示 UI</li>
@@ -2699,7 +2707,7 @@
         // ================================================================
         // 旧版本用过的键名，登录后可作为「旧数据」导入
         // 应用版本号：升级时只改这一处
-        const APP_VERSION = 'v1.7.2';
+        const APP_VERSION = 'v1.7.3';
 
         const LEGACY_KEY = 'hybrid_energy_records';
 
@@ -4058,6 +4066,7 @@
 
             monthlyView.classList.toggle('hidden', mode !== 'monthly');
             annualView.classList.toggle('hidden', mode !== 'annual');
+            document.body.classList.toggle('annual-mode', mode === 'annual');
 
             if (mode === 'monthly') {
                 renderMonthlyView();
