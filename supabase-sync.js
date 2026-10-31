@@ -1,4 +1,4 @@
-/* ================================================================
+﻿/* ================================================================
    小紫油电记录 · Supabase 免服务器版
    数据直接存到你自己的 Supabase 项目（免费、不要信用卡），
    网页挂在 GitHub Pages 上，没有任何自己的后端要维护。
@@ -628,6 +628,74 @@
         if (wasOpen && window.__ovLeave) window.__ovLeave();
     }
 
+    // ── 隐藏入口：连续点 5 次头像才出现「修改显示名称」 ──
+    let avatarTaps = 0;
+    let lastTapAt = 0;
+
+    function openNickEditor() {
+        const box = byId('acctNickBox');
+        if (!box) return;
+        byId('nickInput').value = (SESSION.user && (SESSION.user.displayName || SESSION.user.username)) || '';
+        byId('nickError').textContent = '';
+        box.classList.add('show');
+        setTimeout(() => { try { byId('nickInput').focus(); } catch (e) { /* 忽略 */ } }, 60);
+    }
+
+    async function saveNickname() {
+        const v = (byId('nickInput').value || '').trim();
+        const errEl = byId('nickError');
+        if (!v) { errEl.textContent = '请输入显示名称'; return; }
+        if (v.length > 20) { errEl.textContent = '最多 20 个字'; return; }
+        try {
+            await ensureToken();
+            await sb('/auth/v1/user', { method: 'PUT', body: { data: { display_name: v } } });
+            if (SESSION.user) SESSION.user.displayName = v;
+            try {
+                localStorage.setItem(SESSION_KEY, JSON.stringify({
+                    access: SESSION.access,
+                    refresh: SESSION.refresh,
+                    expiresAt: SESSION.expiresAt,
+                    user: SESSION.user,
+                }));
+            } catch (e) { /* 忽略 */ }
+            byId('acctNickBox').classList.remove('show');
+            byId('acctNickRow').style.display = 'none';
+            renderAccountPanel();
+            toast('显示名称已更新');
+        } catch (e) {
+            errEl.textContent = e.message || '保存失败';
+        }
+    }
+
+    function wireNicknameEditor() {
+        const avatar = byId('acctAvatar');
+        if (avatar) {
+            avatar.addEventListener('click', () => {
+                const now = Date.now();
+                if (now - lastTapAt > 1500) avatarTaps = 0;   // 间隔太久就重新计数
+                lastTapAt = now;
+                avatarTaps += 1;
+                if (avatarTaps >= 5) {
+                    avatarTaps = 0;
+                    const row = byId('acctNickRow');
+                    if (row) row.style.display = '';
+                }
+            });
+        }
+        const row = byId('acctNickRow');
+        if (row) row.addEventListener('click', openNickEditor);
+        const save = byId('nickSave');
+        if (save) save.addEventListener('click', saveNickname);
+        const cancel = byId('nickCancel');
+        if (cancel) {
+            cancel.addEventListener('click', () => {
+                byId('acctNickBox').classList.remove('show');
+                byId('nickError').textContent = '';
+            });
+        }
+    }
+    window.__wireNicknameEditor = wireNicknameEditor;
+
     async function savePassword() {
         const newPass = byId('pwdNew').value;
         const errEl = byId('pwdError');
@@ -657,6 +725,7 @@
 
     function wireAccountUI() {
         byId('acctBtn').addEventListener('click', openAccount);
+        wireNicknameEditor();   // 隐藏入口：连点头像 5 次
 
         // 使用说明的开关统一在 index.html 内联脚本里绑定（window.__openGuide）
 
