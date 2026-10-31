@@ -2216,6 +2216,8 @@
                 <li>修复：鸿蒙上下拉返回时，「更新日志」会直接退回浏览器首页。原因是打开这个页面时没有向浏览器历史登记</li>
                 <li>修复：从账号面板打开「月度小结」时弹窗一闪就消失（关闭面板触发的回退把刚打开的小结一起关掉了）。
                     现在关闭弹层会先等 60ms，期间若又打开新页面就取消回退</li>
+                <li>修复：按一次返回却退了两条历史——关闭弹层时又重复排了一次回退，几次之后就会直接退出到浏览器首页。
+                    现在由返回手势触发的关闭不会再补一次回退，且回退前会确认历史标记</li>
                 <li>使用说明 / 更新日志 / 月度小结 左上角新增「‹ 返回」，手势返回不管用时可以直接点</li>
             </ul>
 
@@ -4003,10 +4005,12 @@
         }
 
         function closeSheet() {
+            const wasOpen = bottomSheet.classList.contains('active');
             bottomSheet.classList.remove('active');
             overlay.classList.remove('active');
             sheetOpen = false;
             document.body.style.overflow = '';
+            if (wasOpen && window.__ovLeave) window.__ovLeave();
         }
 
         // ================================================================
@@ -4531,8 +4535,10 @@
             pendingRecord = null;
             const ov = document.getElementById('pickOverlay');
             const sh = document.getElementById('pickSheet');
+            const wasOpen = !!(sh && sh.classList.contains('active'));
             if (ov) ov.classList.remove('active');
             if (sh) sh.classList.remove('active');
+            if (wasOpen && window.__ovLeave) window.__ovLeave();
         }
 
         // ================================================================
@@ -4815,6 +4821,8 @@
         // ── 浏览器返回键 / 手势：先关弹层，再离开页面 ──
         let ovDepth = 0;
         let pendingBack = null;
+        // 由「浏览器返回」触发的关闭过程中，禁止再排一次 history.back()
+        let suppressLeave = false;
 
         window.__ovEnter = function () {
             // 上一个弹层刚关、回退还没执行就又打开了新弹层 → 取消那次回退
@@ -4836,12 +4844,17 @@
         };
 
         window.__ovLeave = function () {
+            if (suppressLeave) return;      // 正在处理返回手势，不再多退一条
             if (ovDepth === 0) return;
             ovDepth--;
             if (ovDepth === 0) {
                 if (pendingBack) clearTimeout(pendingBack);
                 pendingBack = setTimeout(function () {
                     pendingBack = null;
+                    // 只有当前历史条目确实是我们压入的标记才回退，
+                    // 防止历史已经被手势消耗掉时再退一条（会退出到浏览器首页）
+                    const marked = !!(history.state && history.state.ov);
+                    if (!marked) return;
                     try { history.back(); } catch (e) { /* 忽略 */ }
                 }, 60);
             }
@@ -4865,7 +4878,15 @@
         }
         function onBackGesture() {
             if (ovDepth === 0) return; // 是我们自己 history.back() 触发的那次
-            closeAllOverlays();
+            // 关键：先归零并抑制，避免下面关闭弹层时又排一次 history.back()
+            // （否则「按一次返回 = 退两条历史」，几次之后就会退出到浏览器首页）
+            ovDepth = 0;
+            suppressLeave = true;
+            try {
+                closeAllOverlays();
+            } finally {
+                suppressLeave = false;
+            }
         }
         // 多数系统走 popstate；个别系统把返回表现为 hash 变化，一并接住
         window.addEventListener('popstate', onBackGesture);
