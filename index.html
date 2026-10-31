@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8" />
@@ -1192,11 +1192,9 @@
             display: none !important;
         }
 
-        /* 年度视图内滚动 */
+        /* 年度视图：不再限定高度，内容自然铺开（改为整页滚动） */
         .annual-scroll {
-            max-height: 420px;
-            overflow-y: auto;
-            padding-right: 2px;
+            padding-right: 0;
         }
         .annual-scroll::-webkit-scrollbar {
             width: 4px;
@@ -2258,6 +2256,11 @@
             <button class="guide-close" id="changelogClose" title="关闭">✕</button>
         </div>
         <div class="guide-body" id="changelogBody">
+            <h2>v1.7.2 · 2026-10-31</h2>
+            <ul>
+                <li>优化年度汇总展示 UI</li>
+            </ul>
+
             <h2>v1.7.1 · 2026-10-31</h2>
             <ul>
                 <li>修复：账号名的大小写被忽略——注册时输入 <code>ALICE</code>，界面却显示 <code>alice</code>。现在显示你当初输入的原样</li>
@@ -2696,7 +2699,7 @@
         // ================================================================
         // 旧版本用过的键名，登录后可作为「旧数据」导入
         // 应用版本号：升级时只改这一处
-        const APP_VERSION = 'v1.7.1';
+        const APP_VERSION = 'v1.7.2';
 
         const LEGACY_KEY = 'hybrid_energy_records';
 
