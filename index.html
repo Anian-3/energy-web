@@ -2699,6 +2699,11 @@
             <button class="guide-close" id="changelogClose" title="关闭">✕</button>
         </div>
         <div class="guide-body" id="changelogBody">
+            <h2>v1.9.3 · 2026-11-02</h2>
+            <ul>
+                <li>优化：金额记录的默认选项——燃油车只显示「加油」、纯电车只显示「充电」，打开面板就已选中，不用再自己切</li>
+            </ul>
+
             <h2>v1.9.2 · 2026-11-02</h2>
             <ul>
                 <li>优化：年度汇总的「每月花费分布」改成和每日趋势一样的勾选图例，燃油车/纯电车自动禁用不能记的那一项</li>
@@ -3163,7 +3168,7 @@
         // ================================================================
         // 旧版本用过的键名，登录后可作为「旧数据」导入
         // 应用版本号：升级时只改这一处
-        const APP_VERSION = 'v1.9.2';
+        const APP_VERSION = 'v1.9.3';
 
         const LEGACY_KEY = 'hybrid_energy_records';
 
@@ -4611,6 +4616,13 @@
                 document.getElementById('usePoints').checked = false;
                 inputAmount.focus();
                 autoGrowNote();
+                // 单一动力车型打开就是它能记的那一类，省一次点击
+                const V0 = window.Vehicles;
+                const cur0 = V0 && V0.currentVehicle ? V0.currentVehicle() : null;
+                if (V0 && V0.allowedKinds && cur0) {
+                    const ks = V0.allowedKinds(cur0.type);
+                    if (ks.length === 1) currentType = ks[0];
+                }
             }
             updateTypeToggle(currentType);
             updateSubmitBtn();
@@ -4618,11 +4630,21 @@
         }
 
         function updateTypeToggle(type) {
+            // 单一动力车型只留它能记的那一个按钮（燃油车看不到「充电」）
+            const V = window.Vehicles;
+            const cur = V && V.currentVehicle ? V.currentVehicle() : null;
+            let kinds = ['electric', 'gas'];
+            if (V && V.allowedKinds && cur) kinds = V.allowedKinds(cur.type);
+            if (kinds.indexOf(type) < 0) type = kinds[0] || 'gas';
+
             currentType = type;
             const btns = typeToggle.querySelectorAll('button');
             btns.forEach(btn => {
+                const allowed = kinds.indexOf(btn.dataset.type) >= 0;
+                btn.style.display = allowed ? '' : 'none';
+                btn.disabled = !allowed;
                 btn.className = '';
-                if (btn.dataset.type === type) {
+                if (allowed && btn.dataset.type === type) {
                     btn.classList.add(type === 'electric' ? 'active-e' : 'active-g');
                 }
             });
@@ -6254,9 +6276,9 @@
             }, 320);
         });
     </script>
-    <script src="./guide.js?v=192"></script>
-    <script src="./vehicles.js?v=192"></script>
-    <script src="./supabase-sync.js?v=192"></script>
+    <script src="./guide.js?v=193"></script>
+    <script src="./vehicles.js?v=193"></script>
+    <script src="./supabase-sync.js?v=193"></script>
 
     <!-- ===== 首次使用：连接 Supabase ===== -->
     <div class="login-screen hidden" id="setupScreen">
