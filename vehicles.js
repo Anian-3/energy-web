@@ -85,7 +85,7 @@
 
     // ───────────────────────── 基础查询 ─────────────────────────
     function savedOrder() {
-        const meta = typeof window.__readMeta === 'function' ? window.__readMeta() : null;
+        const meta = window.__prefs ? window.__prefs.read() : null;
         return meta && Array.isArray(meta.vehicle_order) ? meta.vehicle_order : [];
     }
 
@@ -112,7 +112,9 @@
         list[i] = list[j];
         list[j] = t;
         const ids = list.map((v) => v.id);
-        if (typeof window.__updateMeta === 'function') {
+        if (window.__prefs) {
+            window.__prefs.update({ vehicle_order: ids });
+        } else if (typeof window.__updateMeta === 'function') {
             window.__updateMeta({ vehicle_order: ids });
         }
         renderVehicleBar();
@@ -1248,6 +1250,8 @@
         setCurrentVehicle,
         renderVehicleUI,
         renderVehicleBar,
+        renderVehicleList,
+        moveVehicle,
         renderPerKm,
         applyTypeConstraints,
         allowedKinds,

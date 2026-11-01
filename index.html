@@ -2308,10 +2308,6 @@
             <span class="date-title">常用备注</span>
             <button class="close-btn" id="noteClose">✕</button>
         </div>
-        <div class="note-tip">
-            点候选词是「追加」到已写内容后面，不会覆盖；<br />
-            「单价： 元/L」那种会把光标停在该填数字的位置。
-        </div>
         <div class="tpl-list" id="noteTplList"></div>
         <div class="tpl-add">
             <input type="text" class="tpl-input" id="noteTplInput" maxlength="20" placeholder="新增一条，如：余额：" />
@@ -2383,6 +2379,12 @@
             <button class="guide-close" id="changelogClose" title="关闭">✕</button>
         </div>
         <div class="guide-body" id="changelogBody">
+            <h2>v1.8.1 · 2026-11-01</h2>
+            <ul>
+                <li>新增：记账时可以点「常用备注」候选词，一键填「余额：」「单价： 元/L」，点一下是追加不会覆盖，光标自动停在要填数字的位置；候选词可自己增删、调顺序</li>
+                <li>新增：车辆管理页可以调顺序（上移 / 下移），顶部车辆标签的顺序跟着变</li>
+            </ul>
+
             <h2>v1.8.0 · 2026-11-01</h2>
             <ul>
                 <li>改名「油电账本」，图标换新</li>
@@ -2835,7 +2837,7 @@
         // ================================================================
         // 旧版本用过的键名，登录后可作为「旧数据」导入
         // 应用版本号：升级时只改这一处
-        const APP_VERSION = 'v1.8.0';
+        const APP_VERSION = 'v1.8.1';
 
         const LEGACY_KEY = 'hybrid_energy_records';
 
@@ -4536,7 +4538,7 @@
         const DEFAULT_NOTE_TEMPLATES = ['余额：', '单价： 元/L'];
 
         function readNoteTemplates() {
-            const meta = typeof window.__readMeta === 'function' ? window.__readMeta() : null;
+            const meta = window.__prefs ? window.__prefs.read() : null;
             const list = meta && Array.isArray(meta.note_templates) ? meta.note_templates : null;
             if (list && list.length) return list.slice();
             return DEFAULT_NOTE_TEMPLATES.slice();
@@ -4547,9 +4549,7 @@
                 .map((t) => String(t == null ? '' : t).trim())
                 .filter((t) => t)
                 .slice(0, 12);
-            if (typeof window.__updateMeta === 'function') {
-                window.__updateMeta({ note_templates: clean });
-            }
+            if (window.__prefs) window.__prefs.update({ note_templates: clean });
             renderNoteChips();
             renderNoteSheet();
         }
@@ -4557,7 +4557,7 @@
         /** 追加到备注框（不是替换），并按要求把光标放到该输数字的位置 */
         function appendNoteTemplate(tpl) {
             if (!inputNote) return;
-            const cur = String(inputNote.value || '').replace(/s+$/, '');
+            const cur = String(inputNote.value || '').replace(/[\s]+$/, '');
             const limit = inputNote.maxLength > 0 ? inputNote.maxLength : 50;
             let next = cur ? cur + ' ' + tpl : tpl;
             if (next.length > limit) next = next.slice(0, limit);
@@ -5332,11 +5332,62 @@
         window.addEventListener('popstate', onBackGesture);
         window.addEventListener('hashchange', onBackGesture);
 
+        // ================================================================
+        //  账号级小设置（车辆顺序 / 备注模板）
+        //  优先读云端 user_metadata；云端读不到（离线、或旧版 sync 文件）时用本机兜底
+        // ================================================================
+        const PREFS_KEY = 'er_prefs';
+        function localPrefs() {
+            try { return JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') || {}; } catch (e) { return {}; }
+        }
+        function saveLocalPrefs(patch) {
+            const merged = Object.assign({}, localPrefs(), patch);
+            try { localStorage.setItem(PREFS_KEY, JSON.stringify(merged)); } catch (e) { /* 忽略 */ }
+            return merged;
+        }
+        function readPrefs() {
+            const local = localPrefs();
+            const remote = typeof window.__readMeta === 'function' ? window.__readMeta() : null;
+            if (remote && typeof remote === 'object') {
+                const patch = {};
+                Object.keys(remote).forEach(function (k) {
+                    if (remote[k] !== null && remote[k] !== undefined) patch[k] = remote[k];
+                });
+                if (Object.keys(patch).length) {
+                    const merged = Object.assign({}, local, patch);
+                    try { localStorage.setItem(PREFS_KEY, JSON.stringify(merged)); } catch (e) { /* 忽略 */ }
+                    return merged;
+                }
+            }
+            return local;
+        }
+        function updatePrefs(patch) {
+            saveLocalPrefs(patch);
+            if (typeof window.__updateMeta === 'function') {
+                try { window.__updateMeta(patch); } catch (e) { /* 忽略 */ }
+            }
+        }
+        window.__prefs = { read: readPrefs, update: updatePrefs };
+
+        // 旧文件自检：新功能依赖新版 vehicles.js / supabase-sync.js，缺了就明确提示，不静默失败
+        let staleWarned = false;
+        function checkStaleFiles() {
+            if (staleWarned) return;
+            const v = window.Vehicles;
+            const miss = [];
+            if (!v || typeof v.moveVehicle !== 'function') miss.push('vehicles.js');
+            if (typeof window.__updateMeta !== 'function') miss.push('supabase-sync.js');
+            if (!miss.length) return;
+            staleWarned = true;
+            showToast('有文件还是旧版（' + miss.join('、') + '），排序等功能可能不生效，请重新上传后刷新');
+        }
+
         document.addEventListener('DOMContentLoaded', function () {
             paintVersion();
             wireChangelog();
             if (typeof window.__boot === 'function') window.__boot();
             else init();
+            setTimeout(checkStaleFiles, 3500);
         });
     </script>
     <script src="./guide.js"></script>
