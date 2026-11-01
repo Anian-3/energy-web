@@ -1933,6 +1933,12 @@
             color: #2563eb;
             font-weight: 600;
         }
+        .site-chip.add {
+            border-style: dashed;
+            color: #64748b;
+            font-weight: 700;
+            padding: 5px 10px;
+        }
         .site-breakdown {
             margin-top: 8px;
             font-size: 11.5px;
@@ -2023,6 +2029,10 @@
         /* 常用备注管理 */
         #noteOverlay { z-index: 130; }
         #noteSheet { z-index: 131; }
+        /* 充电标签管理 */
+        #siteOverlay { z-index: 132; }
+        #siteSheet { z-index: 133; }
+        .site-row { flex-wrap: wrap; }
         .tpl-list { margin-top: 4px; }
         .tpl-row { display: flex; align-items: center; gap: 6px; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
         .tpl-row .tpl-text { flex: 1; min-width: 0; font-size: 14px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2554,6 +2564,21 @@
         </div>
     </div>
 
+    <!-- ===== 充电标签管理 ===== -->
+    <div class="overlay" id="siteOverlay"></div>
+    <div class="bottom-sheet" id="siteSheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+            <span class="date-title">充电标签</span>
+            <button class="close-btn" id="siteClose2">✕</button>
+        </div>
+        <div class="tpl-list" id="siteTplList"></div>
+        <div class="tpl-add">
+            <input type="text" class="tpl-input" id="siteTplInput" maxlength="10" placeholder="新增一个，如：公司" />
+            <button type="button" class="tpl-add-btn" id="siteTplAdd">添加</button>
+        </div>
+    </div>
+
     <!-- ===== 年月快切 ===== -->
     <div class="overlay" id="ymOverlay"></div>
     <div class="bottom-sheet" id="ymSheet">
@@ -2655,6 +2680,7 @@
                 <li>新增：汇总卡按车型显示——混动车看电费 + 油费；燃油车只谈加油，纯电车只谈充电</li>
                 <li>新增：「本月总花费」左右加了 ‹ ›，可以直接翻到前后月份</li>
                 <li>新增：历年汇总右上角显示「使用以来」一共花了多少</li>
+                <li>新增：充电标签（家充 / 快充 / 公司）可以自己加、改名、删、调顺序，记账时点「＋」管理</li>
                 <li>优化：电费、油费前面的小圆点和金额对齐了</li>
             </ul>
 
@@ -2687,7 +2713,7 @@
 
             <h2>v1.6.x · 2026-10-31</h2>
             <ul>
-                <li>新增：首次配置页点[获取帮助]查看图文步骤</li>
+                <li>新增：首次配置页点「获取帮助」查看图文步骤</li>
                 <li>优化：支持浏览器返回键/手势返回关闭弹窗；部分面板增加关闭按钮</li>
                 <li>修复：电费提示信息显示异常的 bug，缺纯电里程拆分时按历史比例估算</li>
             </ul>
@@ -3090,11 +3116,7 @@
                     <input type="checkbox" id="usePoints" /> 🎫 积分
                 </label>
             </div>
-            <div class="site-row" id="siteRow">
-                <button type="button" class="site-chip" data-site="home">🏠 家充</button>
-                <button type="button" class="site-chip" data-site="fast">⚡ 快充</button>
-                <button type="button" class="site-chip" data-site="company">🏢 公司</button>
-            </div>
+            <div class="site-row" id="siteRow"></div>
             <div class="quick-row" id="quickAmounts"></div>
             <div class="quick-row" id="quickNotes" style="display:none"></div>
             <div class="form-row row-note">
@@ -3963,27 +3985,31 @@
             renderSummaryPanels();
             renderLastHints();
 
-            // 充电构成：只有标记过场景才显示
+            // 充电构成：只有标记过标签才显示
             const box = document.getElementById('siteBreakdown');
             if (box) {
                 const monthRecords = getRecordsForMonth(currentYear, currentMonth);
-                const sums = { home: 0, fast: 0, company: 0 };
+                const sums = {};
                 let any = false;
                 monthRecords.forEach((r) => {
                     if (r.type !== 'electric' || !r.chargeSite) return;
-                    if (sums[r.chargeSite] === undefined) return;
-                    sums[r.chargeSite] += Number(r.amount) || 0;
+                    sums[r.chargeSite] = (sums[r.chargeSite] || 0) + (Number(r.amount) || 0);
                     any = true;
                 });
-                const totalCharged = sums.home + sums.fast + sums.company;
+                const ids = Object.keys(sums);
+                const totalCharged = ids.reduce((a, k) => a + sums[k], 0);
                 if (!any || totalCharged <= 0) {
                     box.style.display = 'none';
                 } else {
-                    const parts = [];
-                    ['home', 'fast', 'company'].forEach((k) => {
-                        if (sums[k] <= 0) return;
+                    // 按标签当前的顺序排，删掉的标签排最后
+                    const order = readSites().map((s) => s.id);
+                    ids.sort((a, b) => {
+                        const ia = order.indexOf(a), ib = order.indexOf(b);
+                        return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
+                    });
+                    const parts = ids.map((k) => {
                         const pct = Math.round((sums[k] / totalCharged) * 100);
-                        parts.push(SITE_LABELS[k] + ' ' + formatAmount(sums[k]) + '（' + pct + '%）');
+                        return siteLabel(k) + ' ' + formatAmount(sums[k]) + '（' + pct + '%）';
                     });
                     box.style.display = '';
                     box.innerHTML = '充电构成：' + parts.join(' · ');
@@ -4490,8 +4516,8 @@
                     const pointsMark = r.usePoints ? `<span class="points-mark">🎫积分</span>` : '';
                     // 「全部车辆」视图下，标出这笔属于哪辆车
                     const vehMark = showVehTag(r) ? `<span class="veh-tag">${escText(vehNameOf(r))}</span>` : '';
-                    const siteMark = r.chargeSite && SITE_LABELS[r.chargeSite]
-                        ? `<span class="site-tag">${SITE_LABELS[r.chargeSite]}</span>` : '';
+                    const siteMark = r.chargeSite
+                        ? `<span class="site-tag">${escText(siteLabel(r.chargeSite))}</span>` : '';
                     html += `
                                 <div class="record-item" data-id="${r.id}">
                                     <div class="rec-main">
@@ -4593,6 +4619,7 @@
             paintEditState();
             renderSheet(dateStr);
             if (typeof renderQuickPicks === 'function') renderQuickPicks();
+            renderSiteChips();
             currentSite = lastSite();
             paintSiteRow();
             bottomSheet.classList.add('active');
@@ -4639,9 +4666,49 @@
         //  v1.5.0：省钱账 / 月度小结 / 记账快捷
         // ================================================================
         const pad2 = (n) => String(n).padStart(2, '0');
-        // ── 充电场景：🏠家充 / ⚡快充 / 🏢公司 ──
-        const SITE_LABELS = { home: '🏠 家充', fast: '⚡ 快充', company: '🏢 公司' };
+        // ── 充电标签：默认 🏠家充 / ⚡快充 / 🏢公司，可自己增删改、调顺序 ──
+        const DEFAULT_SITES = [
+            { id: 'home', icon: '🏠', name: '家充' },
+            { id: 'fast', icon: '⚡', name: '快充' },
+            { id: 'company', icon: '🏢', name: '公司' },
+        ];
+        const SITE_ICON_FALLBACK = '🔌';
         let currentSite = '';
+
+        function readSites() {
+            const meta = window.__prefs ? window.__prefs.read() : null;
+            const list = meta && Array.isArray(meta.charge_sites) ? meta.charge_sites : null;
+            if (list && list.length) {
+                return list
+                    .map((s) => ({
+                        id: String((s && s.id) || ''),
+                        icon: String((s && s.icon) || SITE_ICON_FALLBACK),
+                        name: String((s && s.name) || ''),
+                    }))
+                    .filter((s) => s.id && s.name);
+            }
+            return DEFAULT_SITES.map((s) => Object.assign({}, s));
+        }
+
+        function writeSites(list) {
+            const clean = list
+                .map((s) => ({ id: String(s.id || ''), icon: String(s.icon || SITE_ICON_FALLBACK), name: String(s.name || '').trim() }))
+                .filter((s) => s.id && s.name)
+                .slice(0, 8);
+            if (window.__prefs) window.__prefs.update({ charge_sites: clean });
+            try { renderSiteChips(); renderSiteSheet(); } catch (e) { /* 忽略 */ }
+        }
+
+        function siteById(id) {
+            if (!id) return null;
+            return readSites().find((s) => s.id === id) || null;
+        }
+
+        /** 记录行、汇总里用的展示文字；删掉的标签退化成「其他」 */
+        function siteLabel(id) {
+            const s = siteById(id);
+            return s ? s.icon + ' ' + s.name : SITE_ICON_FALLBACK + ' 其他';
+        }
 
         function siteStoreKey() {
             return (window.DB && DB.key ? DB.key() : 'guest') + '_site';
@@ -4652,12 +4719,34 @@
         function saveLastSite(v) {
             try { localStorage.setItem(siteStoreKey(), v || ''); } catch (e) { /* 忽略 */ }
         }
+
+        /** 记账面板里的一行标签（含末尾的「＋」管理入口） */
+        function renderSiteChips() {
+            const row = document.getElementById('siteRow');
+            if (!row) return;
+            const list = readSites();
+            let html = list
+                .map((s) => '<button type="button" class="site-chip" data-site="' + escText(s.id) + '">' + escText(s.icon + ' ' + s.name) + '</button>')
+                .join('');
+            html += '<button type="button" class="site-chip add" id="siteMore" title="管理充电标签">＋</button>';
+            row.innerHTML = html;
+            row.querySelectorAll('.site-chip[data-site]').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const id = btn.dataset.site;
+                    setSite(currentSite === id ? '' : id);
+                });
+            });
+            const more = document.getElementById('siteMore');
+            if (more) more.addEventListener('click', openSiteSheet);
+            paintSiteRow();
+        }
+
         function paintSiteRow() {
             const row = document.getElementById('siteRow');
             if (!row) return;
             const show = currentType === 'electric';
             row.style.display = show ? '' : 'none';
-            row.querySelectorAll('.site-chip').forEach((btn) => {
+            row.querySelectorAll('.site-chip[data-site]').forEach((btn) => {
                 btn.classList.toggle('on', show && btn.dataset.site === currentSite);
             });
         }
@@ -4665,6 +4754,126 @@
             currentSite = site || '';
             saveLastSite(currentSite);
             paintSiteRow();
+        }
+
+        // ── 充电标签管理页（与常用备注同一套交互） ──
+        function renderSiteSheet() {
+            const box = document.getElementById('siteTplList');
+            if (!box) return;
+            const list = readSites();
+            if (!list.length) {
+                box.innerHTML = '<div class="tpl-empty">还没有充电标签</div>';
+                return;
+            }
+            box.innerHTML = list.map((s, i) =>
+                '<div class="tpl-row" data-i="' + i + '">' +
+                '<span class="tpl-text">' + escText(s.icon + ' ' + s.name) + '</span>' +
+                '<button type="button" class="tpl-btn" data-act="up" data-i="' + i + '"' + (i === 0 ? ' disabled' : '') + '>↑</button>' +
+                '<button type="button" class="tpl-btn" data-act="down" data-i="' + i + '"' + (i === list.length - 1 ? ' disabled' : '') + '>↓</button>' +
+                '<button type="button" class="tpl-btn" data-act="edit" data-i="' + i + '">编辑</button>' +
+                '<button type="button" class="tpl-btn del" data-act="del" data-i="' + i + '">删除</button>' +
+                '</div>'
+            ).join('');
+            box.querySelectorAll('.tpl-btn').forEach((btn) => {
+                btn.addEventListener('click', () => onSiteAction(btn.dataset.act, Number(btn.dataset.i)));
+            });
+        }
+
+        function onSiteAction(act, i) {
+            const list = readSites();
+            if (act === 'up' && i > 0) {
+                const t = list[i - 1]; list[i - 1] = list[i]; list[i] = t;
+                writeSites(list);
+            } else if (act === 'down' && i < list.length - 1) {
+                const t = list[i + 1]; list[i + 1] = list[i]; list[i] = t;
+                writeSites(list);
+            } else if (act === 'del') {
+                const site = list[i];
+                askConfirm({
+                    title: '删除这个标签？',
+                    message: '删除后，用过「' + site.icon + ' ' + site.name + '」的记录仍会保留，只是显示成「' + SITE_ICON_FALLBACK + ' 其他」。',
+                    okText: '删除',
+                    danger: true,
+                }).then((ok) => {
+                    if (!ok) return;
+                    const cur = readSites();
+                    cur.splice(i, 1);
+                    writeSites(cur);
+                    if (currentSite === site.id) setSite('');
+                });
+            } else if (act === 'edit') {
+                beginSiteEdit(i, list[i]);
+            }
+        }
+
+        function beginSiteEdit(i, site) {
+            const row = document.querySelector('#siteTplList .tpl-row[data-i="' + i + '"]');
+            if (!row) return;
+            row.innerHTML = '';
+            const ic = document.createElement('input');
+            ic.type = 'text';
+            ic.className = 'tpl-input';
+            ic.style.maxWidth = '52px';
+            ic.maxLength = 4;
+            ic.value = site.icon;
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.className = 'tpl-input';
+            inp.maxLength = 10;
+            inp.value = site.name;
+            const ok = document.createElement('button');
+            ok.type = 'button';
+            ok.className = 'tpl-btn ok';
+            ok.textContent = '保存';
+            const cancel = document.createElement('button');
+            cancel.type = 'button';
+            cancel.className = 'tpl-btn';
+            cancel.textContent = '取消';
+            row.appendChild(ic);
+            row.appendChild(inp);
+            row.appendChild(ok);
+            row.appendChild(cancel);
+            inp.focus();
+            try { inp.setSelectionRange(inp.value.length, inp.value.length); } catch (e) { /* 忽略 */ }
+            ok.addEventListener('click', () => {
+                const name = inp.value.trim();
+                if (!name) return;
+                const list = readSites();
+                list[i] = { id: site.id, icon: (ic.value || '').trim() || site.icon || SITE_ICON_FALLBACK, name };
+                writeSites(list);
+            });
+            cancel.addEventListener('click', renderSiteSheet);
+        }
+
+        function addSite() {
+            const inp = document.getElementById('siteTplInput');
+            if (!inp) return;
+            const v = (inp.value || '').trim();
+            if (!v) return;
+            const list = readSites();
+            if (list.length >= 8) { showToast('最多 8 个标签', 1800); return; }
+            list.push({ id: 'c' + Date.now().toString(36), icon: SITE_ICON_FALLBACK, name: v });
+            inp.value = '';
+            writeSites(list);
+        }
+
+        function openSiteSheet() {
+            renderSiteSheet();
+            const ov = document.getElementById('siteOverlay');
+            const sh = document.getElementById('siteSheet');
+            if (!ov || !sh) return;
+            ov.classList.add('active');
+            sh.classList.add('active');
+            if (window.__ovEnter) window.__ovEnter();
+        }
+
+        function closeSiteSheet() {
+            const ov = document.getElementById('siteOverlay');
+            const sh = document.getElementById('siteSheet');
+            const wasOpen = !!(sh && sh.classList.contains('active'));
+            if (ov) ov.classList.remove('active');
+            if (sh) sh.classList.remove('active');
+            if (wasOpen && window.__ovLeave) window.__ovLeave();
         }
 
         const monthFirst = (y, m) => y + '-' + pad2(m + 1) + '-01';
@@ -5696,11 +5905,19 @@
 
         const siteRowEl = document.getElementById('siteRow');
         if (siteRowEl) {
-            siteRowEl.addEventListener('click', (e) => {
-                const chip = e.target.closest('.site-chip');
-                if (!chip) return;
-                const site = chip.dataset.site;
-                setSite(currentSite === site ? '' : site);
+            // 标签按钮的点击在 renderSiteChips() 里逐个绑定，这里不再冒泡处理
+        }
+
+        const siteCloseBtn = document.getElementById('siteClose2');
+        if (siteCloseBtn) siteCloseBtn.addEventListener('click', closeSiteSheet);
+        const siteOv = document.getElementById('siteOverlay');
+        if (siteOv) siteOv.addEventListener('click', closeSiteSheet);
+        const siteAddBtn = document.getElementById('siteTplAdd');
+        if (siteAddBtn) siteAddBtn.addEventListener('click', addSite);
+        const siteInputEl = document.getElementById('siteTplInput');
+        if (siteInputEl) {
+            siteInputEl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); addSite(); }
             });
         }
 
@@ -5847,11 +6064,11 @@
         function closeAllOverlays() {
             try { if (typeof closeSheet === 'function') closeSheet(); } catch (e) { /* 忽略 */ }
             try { if (window.__closeAccount) window.__closeAccount(); } catch (e) { /* 忽略 */ }
-            ['vehicleSheet', 'mileageSheet', 'conflictSheet', 'pickSheet', 'ymSheet', 'askSheet'].forEach((id) => {
+            ['vehicleSheet', 'mileageSheet', 'conflictSheet', 'pickSheet', 'ymSheet', 'askSheet', 'noteSheet', 'siteSheet'].forEach((id) => {
                 const el = document.getElementById(id);
                 if (el) el.classList.remove('active');
             });
-            ['vehicleOverlay', 'mileageOverlay', 'conflictOverlay', 'pickOverlay', 'ymOverlay', 'askOverlay'].forEach((id) => {
+            ['vehicleOverlay', 'mileageOverlay', 'conflictOverlay', 'pickOverlay', 'ymOverlay', 'askOverlay', 'noteOverlay', 'siteOverlay'].forEach((id) => {
                 const el = document.getElementById(id);
                 if (el) el.classList.remove('active');
             });
