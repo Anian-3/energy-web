@@ -883,6 +883,14 @@
         const upto = to ? readings.filter((o) => o.date <= to) : readings;
         const last = upto.length ? upto[upto.length - 1] : null;
 
+        // 起点恰好等于终点（通常是月初当天记了一次读数，而它又是最后一条）时，
+        // 往前退一条更早的读数当起点，否则会自己跟自己比、算出 0 公里。
+        if (from && base && last && base.date === last.date) {
+            const earlier = readings.filter((o) => o.date < base.date);
+            const prev = earlier.length ? earlier[earlier.length - 1] : null;
+            if (prev && daysBetween(prev.date, from) <= 10) base = prev;
+        }
+
         if (!base || !last) {
             out.note = from ? '本月缺少起点读数，记一次里程就能算' : '缺少里程数据';
             return out;
