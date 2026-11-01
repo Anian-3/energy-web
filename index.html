@@ -2675,6 +2675,12 @@
             <button class="guide-close" id="changelogClose" title="关闭">✕</button>
         </div>
         <div class="guide-body" id="changelogBody">
+            <h2>v1.9.2 · 2026-11-02</h2>
+            <ul>
+                <li>优化：年度汇总的「每月花费分布」改成和每日趋势一样的勾选图例，燃油车/纯电车自动禁用不能记的那一项</li>
+                <li>优化：燃油车记账时不再显示充电标签</li>
+            </ul>
+
             <h2>v1.9.1 · 2026-11-01</h2>
             <ul>
                 <li>新增：汇总卡按车型显示——混动车看电费 + 油费；燃油车只谈加油，纯电车只谈充电</li>
@@ -3132,7 +3138,7 @@
         // ================================================================
         // 旧版本用过的键名，登录后可作为「旧数据」导入
         // 应用版本号：升级时只改这一处
-        const APP_VERSION = 'v1.9.1';
+        const APP_VERSION = 'v1.9.2';
 
         const LEGACY_KEY = 'hybrid_energy_records';
 
@@ -4366,12 +4372,12 @@
 
             const isBar = chartType === 'bar';
 
-            // 每日趋势用页面上的勾选图例；年度柱状图仍用画布内图例
-            if (trendLegend) trendLegend.style.display = isBar ? 'none' : '';
-            if (!isBar) renderTrendLegend();
+            // 月度、年度共用页面上的勾选图例（按车型禁用不能记的那一条）
+            if (trendLegend) trendLegend.style.display = '';
+            renderTrendLegend();
 
-            const showEv = isBar ? true : trendVisible.electric;
-            const showGas = isBar ? true : trendVisible.gas;
+            const showEv = !!trendVisible.electric;
+            const showGas = !!trendVisible.gas;
 
             if (!hasData || (!showEv && !showGas)) {
                 chartCanvas.style.display = 'none';
@@ -4427,7 +4433,8 @@
                     maintainAspectRatio: false,
                     plugins: {
                         legend: {
-                            display: isBar,
+                            // 图例统一用页面上那排可点的复选框，画布内不再画一份
+                            display: false,
                             position: 'top',
                             labels: {
                                 boxWidth: 12,
@@ -4596,6 +4603,7 @@
                 pointsLabel.classList.add('is-disabled');
             }
             updateSubmitBtn();
+            if (typeof paintSiteRow === 'function') paintSiteRow();
         }
 
         function updateSubmitBtn() {
@@ -4744,7 +4752,10 @@
         function paintSiteRow() {
             const row = document.getElementById('siteRow');
             if (!row) return;
-            const show = currentType === 'electric';
+            // 只有「充电」这一笔、且这辆车真的能充电时，才显示充电标签
+            const V = window.Vehicles;
+            const canEv = V && V.canRecordKind ? V.canRecordKind('electric') !== false : true;
+            const show = currentType === 'electric' && canEv;
             row.style.display = show ? '' : 'none';
             row.querySelectorAll('.site-chip[data-site]').forEach((btn) => {
                 btn.classList.toggle('on', show && btn.dataset.site === currentSite);
@@ -5953,7 +5964,9 @@
                 const key = btn.dataset.series;
                 trendVisible[key] = !trendVisible[key];
                 renderTrendLegend();
-                renderMonthlyChart();
+                // 年度柱状图与月度折线图共用这排图例，谁在前台就刷谁
+                if (viewMode === 'annual') renderAnnualChart();
+                else renderMonthlyChart();
             });
         }
 
@@ -6206,9 +6219,9 @@
             }, 320);
         });
     </script>
-    <script src="./guide.js?v=191"></script>
-    <script src="./vehicles.js?v=191"></script>
-    <script src="./supabase-sync.js?v=191"></script>
+    <script src="./guide.js?v=192"></script>
+    <script src="./vehicles.js?v=192"></script>
+    <script src="./supabase-sync.js?v=192"></script>
 
     <!-- ===== 首次使用：连接 Supabase ===== -->
     <div class="login-screen hidden" id="setupScreen">
