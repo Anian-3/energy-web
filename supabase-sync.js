@@ -394,6 +394,22 @@
             records = loadRecords();
             if (changed && typeof renderAll === 'function') renderAll();
 
+            // 3) 账号设置（备注词 / 车辆顺序 / 充电标签）：先补传本机没成功的改动，再拉服务器最新
+            let prefsDirty = null;
+            try { prefsDirty = localStorage.getItem('er_prefs_dirty'); } catch (e) { /* 忽略 */ }
+            if (prefsDirty === '1' && window.__prefs) {
+                const local = window.__prefs.read() || {};
+                await updateMeta({
+                    note_templates: local.note_templates,
+                    vehicle_order: local.vehicle_order,
+                    charge_sites: local.charge_sites,
+                });
+            }
+            const meta = await fetchMeta();
+            if (meta && typeof window.__onPrefsSynced === 'function') {
+                try { window.__onPrefsSynced(meta); } catch (e) { console.warn('[meta] 渲染设置失败', e); }
+            }
+
             lastSyncAt = Date.now();
             localStorage.setItem('sb_last_sync', String(lastSyncAt));
             setStatus('ok', '已同步');
@@ -661,26 +677,62 @@
     }
 
     /**
+     * 只读：向服务器要一份 user_metadata，不改本地缓存。
+     * updateMeta 做「读-改-写」时用这个，避免中间态被 readPrefs 读到。
+     */
+    async function fetchMetaRaw() {
+        if (!SESSION || !SESSION.access) return null;
+        await ensureToken();
+        const data = await sb('/auth/v1/user', { method: 'GET' });
+        return (data && data.user_metadata) || {};
+    }
+
+    /**
+     * 从服务器重新拉一次 user_metadata（备注词、车辆顺序、充电标签都在这里），
+     * 并把结果写回本地会话缓存。失败返回 null，不影响主流程。
+     */
+    async function fetchMeta() {
+        if (!SESSION || !SESSION.access) return null;
+        try {
+            const meta = await fetchMetaRaw();
+            if (meta === null) return null;
+            if (SESSION.user) {
+                SESSION.user.userMeta = meta;
+                persistSession();
+            }
+            return meta;
+        } catch (e) {
+            console.warn('[meta] 拉取失败', e);
+            return null;
+        }
+    }
+
+    /**
      * 合并写入 user_metadata：
      *   __updateMeta({ note_templates: [...] })
+     * 先取服务器最新值再合并，避免两台设备互相覆盖。
      * 返回值：true 成功 / false 失败（失败时本地先改，下次同步再补）
      */
     async function updateMeta(patch) {
         if (!SESSION || !SESSION.user) return false;
-        const merged = Object.assign({}, readMeta(), patch || {});
-        SESSION.user.userMeta = merged;
-        persistSession();
         try {
-            await ensureToken();
+            const fresh = await fetchMetaRaw();
+            const merged = Object.assign({}, fresh || readMeta(), patch || {});
             await sb('/auth/v1/user', { method: 'PUT', body: { data: merged } });
+            SESSION.user.userMeta = merged;
+            persistSession();
+            try { localStorage.removeItem('er_prefs_dirty'); } catch (e) { /* 忽略 */ }
             return true;
         } catch (e) {
             console.warn('[meta] 保存失败', e);
+            // 记一笔，下次同步时补传
+            try { localStorage.setItem('er_prefs_dirty', '1'); } catch (err) { /* 忽略 */ }
             return false;
         }
     }
 
     window.__readMeta = readMeta;
+    window.__fetchMeta = fetchMeta;
     window.__updateMeta = updateMeta;
 
     async function saveNickname() {

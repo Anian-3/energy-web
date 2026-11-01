@@ -2702,6 +2702,7 @@
             <h2>v1.9.3 · 2026-11-02</h2>
             <ul>
                 <li>优化：金额记录的默认选项——燃油车只显示「加油」、纯电车只显示「充电」，打开面板就已选中，不用再自己切</li>
+                <li>修复：车辆管理页的排序、常用备注词、充电标签在手机和电脑之间不同步的 bug——现在点「立即同步」会把这些设置一起同步</li>
             </ul>
 
             <h2>v1.9.2 · 2026-11-02</h2>
@@ -6169,6 +6170,23 @@
         //  优先读云端 user_metadata；云端读不到（离线、或旧版 sync 文件）时用本机兜底
         // ================================================================
         const PREFS_KEY = 'er_prefs';
+        const PREFS_PENDING_KEY = 'er_prefs_pending';
+
+        function readPending() {
+            try { return JSON.parse(localStorage.getItem(PREFS_PENDING_KEY) || '[]') || []; } catch (e) { return []; }
+        }
+        function writePending(list) {
+            try { localStorage.setItem(PREFS_PENDING_KEY, JSON.stringify(list)); } catch (e) { /* 忽略 */ }
+        }
+        function markPending(keys) {
+            const now = readPending();
+            keys.forEach(function (k) { if (now.indexOf(k) < 0) now.push(k); });
+            writePending(now);
+        }
+        function clearPending(keys) {
+            writePending(readPending().filter(function (k) { return keys.indexOf(k) < 0; }));
+        }
+
         function localPrefs() {
             try { return JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') || {}; } catch (e) { return {}; }
         }
@@ -6181,9 +6199,12 @@
             const local = localPrefs();
             const remote = typeof window.__readMeta === 'function' ? window.__readMeta() : null;
             if (remote && typeof remote === 'object') {
+                const pending = readPending();
                 const patch = {};
                 Object.keys(remote).forEach(function (k) {
-                    if (remote[k] !== null && remote[k] !== undefined) patch[k] = remote[k];
+                    if (remote[k] === null || remote[k] === undefined) return;
+                    if (pending.indexOf(k) >= 0) return;   // 本机刚改、还没传上去的，不能被云端旧值盖掉
+                    patch[k] = remote[k];
                 });
                 if (Object.keys(patch).length) {
                     const merged = Object.assign({}, local, patch);
@@ -6195,11 +6216,28 @@
         }
         function updatePrefs(patch) {
             saveLocalPrefs(patch);
+            const keys = Object.keys(patch || {});
+            markPending(keys);
             if (typeof window.__updateMeta === 'function') {
-                try { window.__updateMeta(patch); } catch (e) { /* 忽略 */ }
+                try {
+                    const r = window.__updateMeta(patch);
+                    if (r && typeof r.then === 'function') {
+                        r.then(function (ok) { if (ok) clearPending(keys); }).catch(function () { /* 保持 pending */ });
+                    }
+                } catch (e) { /* 保持 pending，下次同步补传 */ }
             }
         }
         window.__prefs = { read: readPrefs, update: updatePrefs };
+
+        // 同步拉到云端设置后，把依赖它的界面刷一遍（顺序、候选词、充电标签）
+        window.__onPrefsSynced = function () {
+            try {
+                if (window.Vehicles && window.Vehicles.renderVehicleUI) window.Vehicles.renderVehicleUI();
+                if (typeof renderNoteChips === 'function') renderNoteChips();
+                if (typeof renderSiteChips === 'function') renderSiteChips();
+                if (typeof renderAll === 'function') renderAll();
+            } catch (e) { /* 忽略 */ }
+        };
 
         // ───────── 通用确认弹层（替代原生 confirm，兼容性/样式都可控） ─────────
         const qid = (id) => document.getElementById(id);
