@@ -102,6 +102,8 @@
                 username: usernameFromEmail(data.user.email || ''),
                 // 账号名不区分大小写，但界面显示用户当初输入的原样
                 displayName: meta.display_name || usernameFromEmail(data.user.email || ''),
+                // 账号级设置：备注模板、车辆顺序等
+                userMeta: meta,
             };
         }
         localStorage.setItem(SESSION_KEY, JSON.stringify({
@@ -641,6 +643,46 @@
         setTimeout(() => { try { byId('nickInput').focus(); } catch (e) { /* 忽略 */ } }, 60);
     }
 
+    // ── 账号级设置（备注模板、车辆顺序）──────────────────────────
+    // 存在 Supabase 的 user_metadata 里，跨设备同步，不需要额外的表
+    function readMeta() {
+        return (SESSION && SESSION.user && SESSION.user.userMeta) || {};
+    }
+
+    function persistSession() {
+        try {
+            localStorage.setItem(SESSION_KEY, JSON.stringify({
+                access: SESSION.access,
+                refresh: SESSION.refresh,
+                expiresAt: SESSION.expiresAt,
+                user: SESSION.user,
+            }));
+        } catch (e) { /* 忽略 */ }
+    }
+
+    /**
+     * 合并写入 user_metadata：
+     *   __updateMeta({ note_templates: [...] })
+     * 返回值：true 成功 / false 失败（失败时本地先改，下次同步再补）
+     */
+    async function updateMeta(patch) {
+        if (!SESSION || !SESSION.user) return false;
+        const merged = Object.assign({}, readMeta(), patch || {});
+        SESSION.user.userMeta = merged;
+        persistSession();
+        try {
+            await ensureToken();
+            await sb('/auth/v1/user', { method: 'PUT', body: { data: merged } });
+            return true;
+        } catch (e) {
+            console.warn('[meta] 保存失败', e);
+            return false;
+        }
+    }
+
+    window.__readMeta = readMeta;
+    window.__updateMeta = updateMeta;
+
     async function saveNickname() {
         const v = (byId('nickInput').value || '').trim();
         const errEl = byId('nickError');
@@ -648,8 +690,11 @@
         if (v.length > 20) { errEl.textContent = '最多 20 个字'; return; }
         try {
             await ensureToken();
-            await sb('/auth/v1/user', { method: 'PUT', body: { data: { display_name: v } } });
-            if (SESSION.user) SESSION.user.displayName = v;
+            await sb('/auth/v1/user', { method: 'PUT', body: { data: Object.assign({}, readMeta(), { display_name: v }) } });
+            if (SESSION.user) {
+                SESSION.user.displayName = v;
+                SESSION.user.userMeta = Object.assign({}, readMeta(), { display_name: v });
+            }
             try {
                 localStorage.setItem(SESSION_KEY, JSON.stringify({
                     access: SESSION.access,

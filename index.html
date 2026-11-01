@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8" />
@@ -730,9 +730,7 @@
             padding: 28px 0;
         }
         .record-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            display: block;
             padding: 12px 14px;
             background: #f8fafc;
             border-radius: var(--radius-sm);
@@ -764,16 +762,19 @@
             background: var(--primary-g-light);
             color: var(--primary-g);
         }
-        .record-item .left .info-text {
-            font-size: 14px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+        .record-item .rec-main {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
         }
-        .record-item .left .info-text .note {
-            color: var(--text-secondary);
+        .record-item .rec-note {
+            margin-top: 7px;
             font-size: 13px;
-            margin-left: 6px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            word-break: break-word;
+            white-space: pre-wrap;
         }
         .record-item .right {
             display: flex;
@@ -1802,7 +1803,34 @@
         }
         .qchip:active { background: #f1f5f9; }
         .qchip.last { border-color: #c7d2fe; color: #4f46e5; }
-        .qchip.note { border-style: dashed; max-width: 9em; overflow: hidden; text-overflow: ellipsis; }
+        .qchip.note { border-style: dashed; max-width: 12em; overflow: hidden; text-overflow: ellipsis; }
+        .qchip.add { border-style: dashed; color: #64748b; font-weight: 700; padding: 6px 12px; }
+
+        /* 常用备注管理 */
+        #noteOverlay { z-index: 130; }
+        #noteSheet { z-index: 131; }
+        .tpl-list { margin-top: 4px; }
+        .tpl-row { display: flex; align-items: center; gap: 6px; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+        .tpl-row .tpl-text { flex: 1; min-width: 0; font-size: 14px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .tpl-row .tpl-btn {
+            border: none; background: #f1f5f9; color: #475569; font-family: inherit; font-size: 12px;
+            padding: 6px 9px; border-radius: 9px; cursor: pointer; flex-shrink: 0;
+        }
+        .tpl-row .tpl-btn:disabled { opacity: .35; }
+        .tpl-row .tpl-btn.del { background: #fef2f2; color: #dc2626; }
+        .tpl-row .tpl-btn.ok { background: #2563eb; color: #fff; }
+        .tpl-empty { padding: 18px 0; font-size: 13px; color: var(--text-secondary); text-align: center; }
+        .tpl-add { display: flex; gap: 8px; margin-top: 14px; }
+        .tpl-input {
+            flex: 1; min-width: 0; font-family: inherit; font-size: 14px; padding: 11px 13px;
+            border: 1px solid #e2e8f0; border-radius: 12px; outline: none; background: #f8fafc;
+        }
+        .tpl-input:focus { border-color: #2563eb; background: #fff; }
+        .tpl-add-btn {
+            border: none; background: #2563eb; color: #fff; font-family: inherit; font-size: 14px;
+            font-weight: 600; padding: 0 18px; border-radius: 12px; cursor: pointer; flex-shrink: 0;
+        }
+        .note-tip { font-size: 12px; color: var(--text-secondary); line-height: 1.6; padding: 4px 0 10px; }
 
         /* ===== 月度小结 ===== */
         .report-screen {
@@ -2051,6 +2079,8 @@
             cursor: pointer;
         }
         .vrow-ops button.danger { color: #dc2626; }
+        .vrow-ops button.sort-btn { padding: 6px 9px; font-weight: 700; color: #475569; }
+        .vrow-ops button.sort-btn:disabled { opacity: .3; }
         .vehicle-form {
             background: #f8fafc;
             border-radius: 14px;
@@ -2268,6 +2298,25 @@
             <button class="close-btn" id="pickClose">✕</button>
         </div>
         <div class="pick-list" id="pickList"></div>
+    </div>
+
+    <!-- ===== 常用备注管理 ===== -->
+    <div class="overlay" id="noteOverlay"></div>
+    <div class="bottom-sheet" id="noteSheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+            <span class="date-title">常用备注</span>
+            <button class="close-btn" id="noteClose">✕</button>
+        </div>
+        <div class="note-tip">
+            点候选词是「追加」到已写内容后面，不会覆盖；<br />
+            「单价： 元/L」那种会把光标停在该填数字的位置。
+        </div>
+        <div class="tpl-list" id="noteTplList"></div>
+        <div class="tpl-add">
+            <input type="text" class="tpl-input" id="noteTplInput" maxlength="20" placeholder="新增一条，如：余额：" />
+            <button type="button" class="tpl-add-btn" id="noteTplAdd">添加</button>
+        </div>
     </div>
 
     <!-- ===== 月度小结 ===== -->
@@ -4060,7 +4109,7 @@
                     const typeLabel = r.type === 'electric' ? '⚡ 充电' : '⛽ 加油';
                     const typeCls = r.type === 'electric' ? 'e' : 'g';
                     const amountCls = r.type === 'electric' ? 'e' : 'g';
-                    const note = r.note ? `<span class="note">${r.note}</span>` : '';
+                    const note = r.note ? `<div class="rec-note">${r.note}</div>` : '';
                     const pointsMark = r.usePoints ? `<span class="points-mark">🎫积分</span>` : '';
                     // 「全部车辆」视图下，标出这笔属于哪辆车
                     const vehMark = showVehTag(r) ? `<span class="veh-tag">${escText(vehNameOf(r))}</span>` : '';
@@ -4068,17 +4117,19 @@
                         ? `<span class="site-tag">${SITE_LABELS[r.chargeSite]}</span>` : '';
                     html += `
                                 <div class="record-item" data-id="${r.id}">
-                                    <div class="left">
-                                        <span class="type-badge ${typeCls}">${typeLabel}</span>
-                                        ${siteMark}
-                                        ${vehMark}
-                                        <span class="info-text">${note}</span>
+                                    <div class="rec-main">
+                                        <div class="left">
+                                            <span class="type-badge ${typeCls}">${typeLabel}</span>
+                                            ${siteMark}
+                                            ${vehMark}
+                                        </div>
+                                        <div class="right">
+                                            ${pointsMark}
+                                            <span class="amount ${amountCls}">${formatAmount(r.amount)}</span>
+                                            <button class="del-btn" data-id="${r.id}">✕</button>
+                                        </div>
                                     </div>
-                                    <div class="right">
-                                        ${pointsMark}
-                                        <span class="amount ${amountCls}">${formatAmount(r.amount)}</span>
-                                        <button class="del-btn" data-id="${r.id}">✕</button>
-                                    </div>
+                                    ${note}
                                 </div>
                             `;
                 });
@@ -4476,22 +4527,165 @@
                 });
             });
 
-            if (noteBox) {
-                const notes = [];
-                sorted.forEach((r) => {
-                    const t = (r.note || '').trim();
-                    if (t && notes.indexOf(t) < 0 && notes.length < 3) notes.push(t);
-                });
-                noteBox.innerHTML = notes
-                    .map((t) => '<button type="button" class="qchip note" data-note="' + escText(t) + '">' + escText(t) + '</button>')
-                    .join('');
-                noteBox.querySelectorAll('.qchip').forEach((btn) => {
-                    btn.addEventListener('click', () => {
-                        inputNote.value = btn.dataset.note;
-                        noteBox.style.display = 'none';
-                    });
-                });
+            renderNoteChips();
+        }
+
+        // ================================================================
+        //  常用备注（账号级设置，存在 user_metadata 里，跨设备同步）
+        // ================================================================
+        const DEFAULT_NOTE_TEMPLATES = ['余额：', '单价： 元/L'];
+
+        function readNoteTemplates() {
+            const meta = typeof window.__readMeta === 'function' ? window.__readMeta() : null;
+            const list = meta && Array.isArray(meta.note_templates) ? meta.note_templates : null;
+            if (list && list.length) return list.slice();
+            return DEFAULT_NOTE_TEMPLATES.slice();
+        }
+
+        function writeNoteTemplates(list) {
+            const clean = list
+                .map((t) => String(t == null ? '' : t).trim())
+                .filter((t) => t)
+                .slice(0, 12);
+            if (typeof window.__updateMeta === 'function') {
+                window.__updateMeta({ note_templates: clean });
             }
+            renderNoteChips();
+            renderNoteSheet();
+        }
+
+        /** 追加到备注框（不是替换），并按要求把光标放到该输数字的位置 */
+        function appendNoteTemplate(tpl) {
+            if (!inputNote) return;
+            const cur = String(inputNote.value || '').replace(/s+$/, '');
+            const limit = inputNote.maxLength > 0 ? inputNote.maxLength : 50;
+            let next = cur ? cur + ' ' + tpl : tpl;
+            if (next.length > limit) next = next.slice(0, limit);
+            inputNote.value = next;
+            // 「单价： 元/L」：光标停在冒号后面，直接输数字
+            let caret = next.length;
+            const m = tpl.match(/^([^：]*：)([\s\S]*)$/);
+            if (m && m[2].trim()) caret = next.length - m[2].length;
+            inputNote.focus();
+            try { inputNote.setSelectionRange(caret, caret); } catch (e) { /* 忽略 */ }
+        }
+
+        function renderNoteChips() {
+            const box = document.getElementById('quickNotes');
+            if (!box) return;
+            const list = readNoteTemplates();
+            let html = list
+                .map((t, i) => '<button type="button" class="qchip note" data-i="' + i + '">' + escText(t) + '</button>')
+                .join('');
+            html += '<button type="button" class="qchip add" id="noteTplMore" title="管理常用备注">＋</button>';
+            box.innerHTML = html;
+            box.style.display = '';
+            box.querySelectorAll('.qchip.note').forEach((btn) => {
+                btn.addEventListener('click', () => appendNoteTemplate(list[Number(btn.dataset.i)]));
+            });
+            const more = document.getElementById('noteTplMore');
+            if (more) more.addEventListener('click', openNoteSheet);
+        }
+
+        function openNoteSheet() {
+            renderNoteSheet();
+            const ov = document.getElementById('noteOverlay');
+            const sh = document.getElementById('noteSheet');
+            if (!ov || !sh) return;
+            ov.classList.add('active');
+            sh.classList.add('active');
+            if (window.__ovEnter) window.__ovEnter();
+        }
+
+        function closeNoteSheet() {
+            const ov = document.getElementById('noteOverlay');
+            const sh = document.getElementById('noteSheet');
+            const wasOpen = !!(sh && sh.classList.contains('active'));
+            if (ov) ov.classList.remove('active');
+            if (sh) sh.classList.remove('active');
+            if (wasOpen && window.__ovLeave) window.__ovLeave();
+        }
+
+        function renderNoteSheet() {
+            const box = document.getElementById('noteTplList');
+            if (!box) return;
+            const list = readNoteTemplates();
+            if (!list.length) {
+                box.innerHTML = '<div class="tpl-empty">还没有常用备注</div>';
+                return;
+            }
+            box.innerHTML = list.map((t, i) =>
+                '<div class="tpl-row" data-i="' + i + '">' +
+                '<span class="tpl-text">' + escText(t) + '</span>' +
+                '<button type="button" class="tpl-btn" data-act="up" data-i="' + i + '"' + (i === 0 ? ' disabled' : '') + '>↑</button>' +
+                '<button type="button" class="tpl-btn" data-act="down" data-i="' + i + '"' + (i === list.length - 1 ? ' disabled' : '') + '>↓</button>' +
+                '<button type="button" class="tpl-btn" data-act="edit" data-i="' + i + '">编辑</button>' +
+                '<button type="button" class="tpl-btn del" data-act="del" data-i="' + i + '">删除</button>' +
+                '</div>'
+            ).join('');
+            box.querySelectorAll('.tpl-btn').forEach((btn) => {
+                btn.addEventListener('click', () => onNoteTplAction(btn.dataset.act, Number(btn.dataset.i)));
+            });
+        }
+
+        function onNoteTplAction(act, i) {
+            const list = readNoteTemplates();
+            if (act === 'up' && i > 0) {
+                const t = list[i - 1]; list[i - 1] = list[i]; list[i] = t;
+                writeNoteTemplates(list);
+            } else if (act === 'down' && i < list.length - 1) {
+                const t = list[i + 1]; list[i + 1] = list[i]; list[i] = t;
+                writeNoteTemplates(list);
+            } else if (act === 'del') {
+                list.splice(i, 1);
+                writeNoteTemplates(list);
+            } else if (act === 'edit') {
+                beginNoteTplEdit(i, list[i]);
+            }
+        }
+
+        function beginNoteTplEdit(i, value) {
+            const row = document.querySelector('#noteTplList .tpl-row[data-i="' + i + '"]');
+            if (!row) return;
+            row.innerHTML = '';
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.className = 'tpl-input';
+            inp.maxLength = 20;
+            inp.value = value;
+            const ok = document.createElement('button');
+            ok.type = 'button';
+            ok.className = 'tpl-btn ok';
+            ok.textContent = '保存';
+            const cancel = document.createElement('button');
+            cancel.type = 'button';
+            cancel.className = 'tpl-btn';
+            cancel.textContent = '取消';
+            row.appendChild(inp);
+            row.appendChild(ok);
+            row.appendChild(cancel);
+            inp.focus();
+            try { inp.setSelectionRange(inp.value.length, inp.value.length); } catch (e) { /* 忽略 */ }
+            ok.addEventListener('click', () => {
+                const v = inp.value.trim();
+                if (!v) return;
+                const list = readNoteTemplates();
+                list[i] = v;
+                writeNoteTemplates(list);
+            });
+            cancel.addEventListener('click', renderNoteSheet);
+        }
+
+        function addNoteTemplate() {
+            const inp = document.getElementById('noteTplInput');
+            if (!inp) return;
+            const v = (inp.value || '').trim();
+            if (!v) return;
+            const list = readNoteTemplates();
+            if (list.length >= 12) { showToast('最多 12 条', 1800); return; }
+            list.push(v);
+            inp.value = '';
+            writeNoteTemplates(list);
         }
 
         /** 拼一份月度小结的数据行 */
@@ -4976,6 +5170,19 @@
         if (pickCloseBtn) pickCloseBtn.addEventListener('click', closeVehiclePick);
         const pickOv = document.getElementById('pickOverlay');
         if (pickOv) pickOv.addEventListener('click', closeVehiclePick);
+
+        const noteCloseBtn = document.getElementById('noteClose');
+        if (noteCloseBtn) noteCloseBtn.addEventListener('click', closeNoteSheet);
+        const noteOv = document.getElementById('noteOverlay');
+        if (noteOv) noteOv.addEventListener('click', closeNoteSheet);
+        const noteAddBtn = document.getElementById('noteTplAdd');
+        if (noteAddBtn) noteAddBtn.addEventListener('click', addNoteTemplate);
+        const noteTplInputEl = document.getElementById('noteTplInput');
+        if (noteTplInputEl) {
+            noteTplInputEl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); addNoteTemplate(); }
+            });
+        }
 
         if (trendLegend) {
             trendLegend.addEventListener('click', (e) => {

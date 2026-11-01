@@ -84,8 +84,41 @@
     }
 
     // ───────────────────────── 基础查询 ─────────────────────────
+    function savedOrder() {
+        const meta = typeof window.__readMeta === 'function' ? window.__readMeta() : null;
+        return meta && Array.isArray(meta.vehicle_order) ? meta.vehicle_order : [];
+    }
+
     function vehicles() {
-        return DB.visible('vehicles').slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+        const list = DB.visible('vehicles').slice();
+        const order = savedOrder();
+        if (!order.length) {
+            return list.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+        }
+        const rank = (v) => {
+            const i = order.indexOf(v.id);
+            return i < 0 ? 9999 : i;
+        };
+        return list.sort((a, b) => rank(a) - rank(b) || (a.createdAt || 0) - (b.createdAt || 0));
+    }
+
+    /** 上移 / 下移（-1 上移，+1 下移），顺序写进账号设置 */
+    function moveVehicle(id, dir) {
+        const list = vehicles();
+        const i = list.findIndex((v) => v.id === id);
+        const j = i + dir;
+        if (i < 0 || j < 0 || j >= list.length) return false;
+        const t = list[i];
+        list[i] = list[j];
+        list[j] = t;
+        const ids = list.map((v) => v.id);
+        if (typeof window.__updateMeta === 'function') {
+            window.__updateMeta({ vehicle_order: ids });
+        }
+        renderVehicleBar();
+        renderVehicleList();
+        if (typeof renderPerKm === 'function') renderPerKm();
+        return true;
     }
 
     function vehicleById(id) {
@@ -329,7 +362,7 @@
             return;
         }
         box.innerHTML = list
-            .map((v) => {
+            .map((v, idx) => {
                 const t = TYPES[v.type] || TYPES.hybrid;
                 const cnt = DB.visibleRecords().filter((r) => resolveVehicleId(r) === v.id).length;
                 return `<div class="vrow">
@@ -341,6 +374,8 @@
                         </div>
                     </div>
                     <div class="vrow-ops">
+                        <button data-act="up" data-id="${v.id}" class="sort-btn"${idx === 0 ? ' disabled' : ''}>↑</button>
+                        <button data-act="down" data-id="${v.id}" class="sort-btn"${idx === list.length - 1 ? ' disabled' : ''}>↓</button>
                         <button data-act="edit" data-id="${v.id}">编辑</button>
                         <button data-act="del" data-id="${v.id}" class="danger">删除</button>
                     </div>
@@ -350,7 +385,10 @@
 
         box.querySelectorAll('button[data-act]').forEach((btn) => {
             btn.addEventListener('click', () => {
-                if (btn.dataset.act === 'edit') openVehicleSheet(btn.dataset.id);
+                const act = btn.dataset.act;
+                if (act === 'edit') openVehicleSheet(btn.dataset.id);
+                else if (act === 'up') moveVehicle(btn.dataset.id, -1);
+                else if (act === 'down') moveVehicle(btn.dataset.id, 1);
                 else deleteVehicle(btn.dataset.id);
             });
         });
