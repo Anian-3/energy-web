@@ -643,6 +643,7 @@
         byId('odoEvHint').style.display = v.type === 'hybrid' ? '' : 'none';
         byId('odoEvHint').textContent = '两个填一个即可，另一个自动算（纯电 + 燃油 = 总里程）';
         renderMileageList();
+        byId('mileageList').scrollTop = 0;
         paintAutoOdo();
         byId('mileageSheet').classList.add('active');
         byId('mileageOverlay').classList.add('active');
@@ -730,8 +731,11 @@
     /** 找出这条日期之前（不含当天）最近的一条读数 */
     function prevOdometer(vehicleId, date, excludeId) {
         return odometerOf(vehicleId)
-            .filter((o) => o.id !== excludeId && String(o.date) < String(date))
-            .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))[0] || null;
+            .filter((o) => o.id !== excludeId && String(o.date) <= String(date))
+            .sort((a, b) => {
+                if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+                return String(b.createdAt || '') < String(a.createdAt || '') ? -1 : 1;
+            })[0] || null;
     }
 
     /** 明显不对的里程：比上一条小，或上一条已经上千而这条不足其十分之一 */

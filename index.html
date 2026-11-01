@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8" />
@@ -693,6 +693,9 @@
             max-height: 85vh;
             display: flex;
             flex-direction: column;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
         }
         .bottom-sheet.active {
             transform: translateY(0);
@@ -2552,15 +2555,12 @@
         <div class="guide-body" id="changelogBody">
             <h2>v1.9.0 · 2026-11-01</h2>
             <ul>
-                <li>新增：点历史记账记录就能改——金额、备注、类型、积分、充电场景都能重填，改完点「保存修改」覆盖原来那条（日期和车辆不变）</li>
-                <li>新增：里程记录也能改。点里程列表里的任意一行，会把那条回填到表单里，改完点「更新」</li>
-                <li>新增：明显不对的里程会先提醒，比如比上一条读数还小、或者上一条已经上万而这次只填了个位数，会问「我再改改 / 就这样保存」，不会闷头存进去</li>
-                <li>新增：点顶部的「2026年11月」可以快速跳到任意年月，不用一个月一个月点箭头</li>
-                <li>备注框改成能换行，上限提到 100 字，写长备注也不会被截断</li>
-                <li>修复：iPhone 上点记里程的日历图标没反应（改成点整块日期区域都能唤起选择器）</li>
-                <li>修复：里程历史只显示最近 30 条，更早的看不到</li>
-                <li>修复：点完常用备注候选词，候选行会消失，得重新点输入框才回来</li>
-                <li>修复：鸿蒙手机上有时新功能不出现（浏览器缓存了旧文件），改成优先拿最新文件，离线仍可用</li>
+                <li>新增：点历史记录就能改金额、备注、类型、积分和充电场景，改完「保存修改」覆盖原来那条</li>
+                <li>新增：里程记录也能改，点列表里的任意一行回填，改完点「更新」</li>
+                <li>新增：明显不对的里程会先提醒一句，确认后再保存</li>
+                <li>新增：点顶部年月可快速跳到任意月份</li>
+                <li>备注框能换行，上限提到 100 字</li>
+                <li>修复：iPhone 日历图标点不动、里程历史只剩 30 条、候选词点完消失、新版本迟迟不生效</li>
             </ul>
 
             <h2>v1.8.1 · 2026-11-01</h2>
@@ -5781,10 +5781,26 @@
             else init();
             setTimeout(checkStaleFiles, 3500);
         });
+
+        /* 手机键盘弹出后会盖住面板下半部分：
+           聚焦输入框时把它滚到可视区中部，保证备注栏看得见 */
+        document.addEventListener('focusin', function (e) {
+            const el = e.target;
+            if (!el || !el.tagName) return;
+            if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') return;
+            if (!el.closest || !el.closest('.bottom-sheet')) return;
+            setTimeout(function () {
+                try {
+                    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                } catch (_) {
+                    try { el.scrollIntoView(); } catch (__) {}
+                }
+            }, 320);
+        });
     </script>
-    <script src="./guide.js"></script>
-    <script src="./vehicles.js"></script>
-    <script src="./supabase-sync.js"></script>
+    <script src="./guide.js?v=190"></script>
+    <script src="./vehicles.js?v=190"></script>
+    <script src="./supabase-sync.js?v=190"></script>
 
     <!-- ===== 首次使用：连接 Supabase ===== -->
     <div class="login-screen hidden" id="setupScreen">
