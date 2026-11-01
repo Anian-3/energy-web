@@ -633,6 +633,8 @@
     function openMileageSheet(dateOverride) {
         const v = currentVehicle();
         if (!v) { toast('先选择一辆车'); return; }
+        editingOdoId = null;
+        paintOdoEditState();
         byId('odoDate').value = dateOverride || (typeof getTodayStr === 'function' ? getTodayStr() : new Date().toISOString().slice(0, 10));
         byId('odoTotal').value = '';
         byId('odoEv').value = '';
@@ -652,6 +654,7 @@
         const wasOpen = byId('mileageSheet').classList.contains('active');
         byId('mileageSheet').classList.remove('active');
         byId('mileageOverlay').classList.remove('active');
+        if (editingOdoId) { editingOdoId = null; paintOdoEditState(); }
         if (wasOpen && window.__ovLeave) window.__ovLeave();
     }
 
@@ -665,11 +668,10 @@
             return;
         }
         box.innerHTML = list
-            .slice(0, 30)
             .map((o) => {
                 const ev = o.evKm != null && o.evKm !== '' ? ` · 纯电 ${o.evKm}` : '';
                 const fuel = o.evKm != null && o.evKm !== '' ? ` · 燃油 ${Number(o.totalKm) - Number(o.evKm)}` : '';
-                return `<div class="orow">
+                return `<div class="orow" data-id="${o.id}">
                     <div>
                         <div class="orow-km">${o.totalKm} km</div>
                         <div class="orow-sub">${o.date}${ev}${fuel}</div>
@@ -678,9 +680,79 @@
                 </div>`;
             })
             .join('');
-        box.querySelectorAll('.orow-del').forEach((btn) => {
-            btn.addEventListener('click', () => deleteOdometer(btn.dataset.id));
+        box.querySelectorAll('.orow').forEach((row) => {
+            row.addEventListener('click', () => startEditOdometer(row.dataset.id));
         });
+        box.querySelectorAll('.orow-del').forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteOdometer(btn.dataset.id);
+            });
+        });
+    }
+
+    // ───────────────────────── 编辑已有里程 ─────────────────────────
+    let editingOdoId = null;
+
+    function paintOdoEditState() {
+        const btn = byId('odoSubmit');
+        if (btn) btn.textContent = editingOdoId ? '✓ 更新' : '保存';
+        const bar = byId('odoEditBar');
+        if (bar) bar.style.display = editingOdoId ? 'flex' : 'none';
+    }
+
+    function startEditOdometer(id) {
+        const all = DB.table('odometer');
+        const o = all.find((x) => x.id === id && !x.deleted);
+        if (!o) return;
+        editingOdoId = id;
+        byId('odoDate').value = o.date;
+        byId('odoTotal').value = String(o.totalKm);
+        if (byId('odoEv')) byId('odoEv').value = o.evKm != null ? String(o.evKm) : '';
+        if (byId('odoFuel')) {
+            byId('odoFuel').value = o.evKm != null ? String(Number(o.totalKm) - Number(o.evKm)) : '';
+        }
+        updateOdoPreview();
+        paintOdoEditState();
+        byId('odoTotal').focus();
+    }
+
+    function cancelEditOdometer() {
+        editingOdoId = null;
+        byId('odoDate').value = todayStr();
+        byId('odoTotal').value = '';
+        if (byId('odoEv')) byId('odoEv').value = '';
+        if (byId('odoFuel')) byId('odoFuel').value = '';
+        updateOdoPreview();
+        paintOdoEditState();
+    }
+
+    /** 找出这条日期之前（不含当天）最近的一条读数 */
+    function prevOdometer(vehicleId, date, excludeId) {
+        return odometerOf(vehicleId)
+            .filter((o) => o.id !== excludeId && String(o.date) < String(date))
+            .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))[0] || null;
+    }
+
+    /** 明显不对的里程：比上一条小，或上一条已经上千而这条不足其十分之一 */
+    function odometerAnomaly(prev, totalKm) {
+        if (!prev) return '';
+        const p = Number(prev.totalKm);
+        if (!Number.isFinite(p) || p <= 0) return '';
+        if (totalKm < p) {
+            return '比上一条读数（' + prev.date + ' · ' + p + ' km）还小';
+        }
+        if (p >= 1000 && totalKm < p / 10) {
+            return '比上一条读数（' + prev.date + ' · ' + p + ' km）小太多，像是少打了一位数';
+        }
+        return '';
+    }
+
+    async function askConfirm(opts) {
+        if (typeof window.__askConfirm === 'function') return window.__askConfirm(opts);
+        // 极端情况（旧 index.html）退回原生确认
+        const msg = (opts.title ? opts.title + '\n' : '') + (opts.message || '');
+        return window.confirm(msg);
     }
 
     /** 里程表单的实时提示：说明另一个字段会被算成多少 */
@@ -713,7 +785,7 @@
         }
     }
 
-    function saveOdometer() {
+    async function saveOdometer() {
         const v = currentVehicle();
         if (!v) return;
         const date = byId('odoDate').value;
@@ -743,8 +815,45 @@
             }
         }
 
+        // 明显不合理的读数，先确认（不硬拦：换车、改表、补录历史都可能出现）
+        const prev = prevOdometer(v.id, date, editingOdoId || '');
+        const warn = odometerAnomaly(prev, totalKm);
+        if (warn) {
+            const ok = await askConfirm({
+                title: '这个里程看着不太对',
+                message:
+                    '这次填的是 ' + totalKm + ' km，' + warn + '。\n\n' +
+                    '如果是少打了一位数，点「取消」改一下；确实如此就点「就这样保存」。',
+                okText: '就这样保存',
+                cancelText: '我再改改',
+            });
+            if (ok !== true) return;
+        }
+
         const all = DB.table('odometer');
         const now = Date.now();
+
+        if (editingOdoId) {
+            const o = all.find((x) => x.id === editingOdoId && !x.deleted);
+            if (o) {
+                o.date = date;
+                o.totalKm = totalKm;
+                o.evKm = v.type === 'hybrid' ? evKm : null;
+                o.updatedAt = now;
+                o.dirty = 1;
+                DB.saveTable('odometer', all);
+                editingOdoId = null;
+                paintOdoEditState();
+                renderMileageList();
+                renderPerKm();
+                if (typeof scheduleSync === 'function') scheduleSync(800);
+                toast('已更新为 ' + totalKm + ' km');
+                return;
+            }
+            editingOdoId = null;
+            paintOdoEditState();
+        }
+
         all.push({
             id: uid(),
             vehicleId: v.id,
@@ -762,24 +871,37 @@
         byId('odoTotal').value = '';
         byId('odoEv').value = '';
         if (byId('odoFuel')) byId('odoFuel').value = '';
+        updateOdoPreview();
         renderMileageList();
         renderPerKm();
         if (typeof scheduleSync === 'function') scheduleSync(800);
         toast('已记录 ' + totalKm + ' km');
     }
 
-    function deleteOdometer(id) {
-        if (!confirm('删除这条里程记录？')) return;
+    async function deleteOdometer(id) {
         const all = DB.table('odometer');
-        const o = all.find((x) => x.id === id);
+        const o = all.find((x) => x.id === id && !x.deleted);
         if (!o) return;
+        const ok = await askConfirm({
+            title: '删除这条里程记录？',
+            message: o.date + ' · ' + o.totalKm + ' km\n\n删除后，每公里花费会按剩下的读数重新计算。',
+            okText: '删除',
+            cancelText: '保留',
+            danger: true,
+        });
+        if (ok !== true) return;
         o.deleted = 1;
         o.updatedAt = Date.now();
         o.dirty = 1;
         DB.saveTable('odometer', all);
+        if (editingOdoId === id) {
+            editingOdoId = null;
+            paintOdoEditState();
+        }
         renderMileageList();
         renderPerKm();
         if (typeof scheduleSync === 'function') scheduleSync(800);
+        toast('已删除');
     }
 
     // ───────────────────────── 每公里花费 ─────────────────────────
@@ -1177,22 +1299,29 @@
         const odoSubmit = byId('odoSubmit');
         if (odoSubmit) odoSubmit.addEventListener('click', saveOdometer);
 
-        // 日期框右侧的日历按钮：点它调起系统日期选择器
+        const odoEditCancel = byId('odoEditCancel');
+        if (odoEditCancel) odoEditCancel.addEventListener('click', cancelEditOdometer);
+        paintOdoEditState();
+
+        // 日期框右侧的日历图标：它现在是 <label for="odoDate">，
+        // 点它浏览器会自动转发成点击输入框（iOS / 安卓 / 桌面都认这一招），
+        // 而且「点输入框」本身就是用户手势，弹出的是系统原生日期选择器。
+        // 以前用 <button> + input.showPicker()，iOS Safari 上 showPicker 不生效、
+        // click() 又不是可信手势，所以点了没反应。
         const odoDateBtn = byId('odoDateBtn');
         if (odoDateBtn) {
-            odoDateBtn.addEventListener('click', () => {
+            odoDateBtn.addEventListener('click', (e) => {
+                // label 的默认转发已经够用；这里只兜住「没转发成功」的浏览器
                 const input = byId('odoDate');
                 if (!input) return;
-                if (typeof input.showPicker === 'function') {
-                    try {
-                        input.showPicker();
-                        return;
-                    } catch (e) {
-                        /* 某些浏览器要求用户手势，退回 focus */
+                if (e.defaultPrevented) return;
+                setTimeout(() => {
+                    if (document.activeElement === input) return;
+                    input.focus();
+                    if (typeof input.showPicker === 'function') {
+                        try { input.showPicker(); } catch (err) { /* 忽略 */ }
                     }
-                }
-                input.focus();
-                input.click();
+                }, 0);
             });
         }
 

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8" />
@@ -383,6 +383,19 @@
         .calendar-nav .month-label {
             font-size: 18px;
             font-weight: 600;
+            cursor: pointer;
+            user-select: none;
+            padding: 4px 10px;
+            border-radius: 12px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .calendar-nav .month-label:active { background: rgba(99, 102, 241, 0.08); }
+        .calendar-nav .month-label::after {
+            content: '▾';
+            font-size: 11px;
+            color: #94a3b8;
+            margin-left: 5px;
+            vertical-align: 2px;
         }
         .calendar-nav .month-label .year {
             font-weight: 400;
@@ -966,15 +979,51 @@
             margin-top: 8px;
             flex-wrap: nowrap;
             gap: 8px;
+            align-items: flex-end;
         }
         .add-form .form-row.row-note .note-input {
             flex: 1 1 auto;
             min-width: 0;
+            resize: none;
+            line-height: 1.4;
+            padding-top: 9px;
+            padding-bottom: 9px;
+            max-height: 92px;      /* 约 3 行，再多就内部滚动 */
+            overflow-y: auto;
         }
         .add-form .form-row.row-note .submit-btn {
             flex: 0 0 auto;
             white-space: nowrap;
         }
+        /* 编辑历史记录时的提示条 */
+        .add-form .edit-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            border-radius: 12px;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            font-size: 13px;
+            color: #1d4ed8;
+            font-weight: 600;
+        }
+        .add-form .edit-bar button {
+            border: 0;
+            background: transparent;
+            color: #2563eb;
+            font-size: 13px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 8px;
+        }
+        .add-form .edit-bar button:active { background: #dbeafe; }
+        .submit-btn.editing { background: #0ea5e9; }
+        .record-item { cursor: pointer; }
 
         /* ===== 页脚版本号 ===== */
         /* 选车面板 */
@@ -1011,6 +1060,71 @@
         /* 数据检查浮在账号面板之上 */
         #conflictOverlay { z-index: 160; }
         #conflictSheet { z-index: 161; }
+
+        /* 年月快切面板 */
+        #ymOverlay { z-index: 130; }
+        #ymSheet { z-index: 131; }
+        .ym-body { padding: 4px 16px 20px; }
+        .ym-years {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 6px 2px 12px;
+            -webkit-overflow-scrolling: touch;
+        }
+        .ym-year {
+            flex: 0 0 auto;
+            padding: 8px 14px;
+            border-radius: 999px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            color: #475569;
+            font-family: inherit;
+            cursor: pointer;
+        }
+        .ym-year.on { background: var(--primary-e); border-color: var(--primary-e); color: #fff; }
+        .ym-months {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+        .ym-month {
+            padding: 14px 0;
+            border-radius: 14px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            font-size: 15px;
+            font-weight: 600;
+            color: #334155;
+            font-family: inherit;
+            cursor: pointer;
+        }
+        .ym-month.on { background: #eff6ff; border-color: #bfdbfe; color: #2563eb; }
+        .ym-month.now { box-shadow: inset 0 0 0 1px #c7d2fe; }
+
+        /* 通用确认弹层：浮在记账/里程面板之上 */
+        #askOverlay { z-index: 170; }
+        #askSheet { z-index: 171; }
+        .ask-body { padding: 4px 20px 22px; }
+        .ask-title { font-size: 17px; font-weight: 700; color: #0f172a; margin-bottom: 8px; }
+        .ask-msg { font-size: 14px; line-height: 1.65; color: #475569; white-space: pre-line; }
+        .ask-msg b { color: #0f172a; }
+        .ask-actions { display: flex; gap: 10px; margin-top: 18px; }
+        .ask-btn {
+            flex: 1 1 0;
+            padding: 13px 0;
+            border: 0;
+            border-radius: 14px;
+            font-size: 15px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+        }
+        .ask-cancel { background: #f1f5f9; color: #475569; }
+        .ask-ok { background: var(--primary-e); color: #fff; }
+        .ask-ok.danger { background: #ef4444; }
 
         .acct-item.acct-warn { cursor: pointer; }
         .acct-item.acct-warn .v { color: #b45309; font-weight: 600; }
@@ -2125,9 +2239,34 @@
         .mileage-form .amount-input, .mileage-form .note-input { width: 100%; }
 
         /* 日期：整框是一个圆角容器，右边固定一个日历按钮，提示「这里能改」 */
-        .mileage-form .date-field {
+        .mileage-form .odo-edit-bar {
             display: flex;
             align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 8px 12px;
+            margin-bottom: 10px;
+            border-radius: 12px;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            font-size: 13px;
+            font-weight: 600;
+            color: #1d4ed8;
+        }
+        .mileage-form .odo-edit-bar button {
+            border: 0;
+            background: transparent;
+            color: #2563eb;
+            font-size: 13px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 8px;
+        }
+        .mileage-form .odo-edit-bar button:active { background: #dbeafe; }
+        .mileage-form .date-field {
+            display: flex;            align-items: center;
             gap: 6px;
             width: 100%;
             max-width: 100%;
@@ -2222,7 +2361,7 @@
             accent-color: #6366f1;
             cursor: pointer;
         }
-        .mileage-list { max-height: 34vh; overflow-y: auto; }
+        .mileage-list { max-height: 42vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
         .orow {
             display: flex;
             align-items: center;
@@ -2315,6 +2454,34 @@
         </div>
     </div>
 
+    <!-- ===== 年月快切 ===== -->
+    <div class="overlay" id="ymOverlay"></div>
+    <div class="bottom-sheet" id="ymSheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+            <span class="date-title">跳到哪个月</span>
+            <button class="close-btn" id="ymClose">✕</button>
+        </div>
+        <div class="ym-body">
+            <div class="ym-years" id="ymYears"></div>
+            <div class="ym-months" id="ymMonths"></div>
+        </div>
+    </div>
+
+    <!-- ===== 通用确认弹层 ===== -->
+    <div class="overlay" id="askOverlay"></div>
+    <div class="bottom-sheet" id="askSheet">
+        <div class="sheet-handle"></div>
+        <div class="ask-body">
+            <div class="ask-title" id="askTitle">确认</div>
+            <div class="ask-msg" id="askMsg"></div>
+            <div class="ask-actions">
+                <button type="button" class="ask-btn ask-cancel" id="askCancel">取消</button>
+                <button type="button" class="ask-btn ask-ok" id="askOk">确定</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ===== 月度小结 ===== -->
     <div class="report-screen hidden" id="reportScreen">
         <div class="report-card">
@@ -2350,9 +2517,13 @@
             <button class="close-btn" id="mileageClose">✕</button>
         </div>
         <div class="mileage-form">
+            <div class="odo-edit-bar" id="odoEditBar" style="display:none">
+                <span>✏️ 正在修改这条里程</span>
+                <button type="button" id="odoEditCancel">取消修改</button>
+            </div>
             <div class="date-field">
                 <input class="note-input" id="odoDate" type="date" />
-                <button type="button" class="date-pick" id="odoDateBtn" aria-label="选择日期" title="选择日期">📅</button>
+                <label class="date-pick" for="odoDate" id="odoDateBtn" aria-label="选择日期" title="选择日期">📅</label>
             </div>
             <input class="amount-input" id="odoTotal" type="number" inputmode="numeric" placeholder="当前总里程（km）" />
             <div id="odoEvField">
@@ -2379,6 +2550,19 @@
             <button class="guide-close" id="changelogClose" title="关闭">✕</button>
         </div>
         <div class="guide-body" id="changelogBody">
+            <h2>v1.9.0 · 2026-11-01</h2>
+            <ul>
+                <li>新增：点历史记账记录就能改——金额、备注、类型、积分、充电场景都能重填，改完点「保存修改」覆盖原来那条（日期和车辆不变）</li>
+                <li>新增：里程记录也能改。点里程列表里的任意一行，会把那条回填到表单里，改完点「更新」</li>
+                <li>新增：明显不对的里程会先提醒，比如比上一条读数还小、或者上一条已经上万而这次只填了个位数，会问「我再改改 / 就这样保存」，不会闷头存进去</li>
+                <li>新增：点顶部的「2026年11月」可以快速跳到任意年月，不用一个月一个月点箭头</li>
+                <li>备注框改成能换行，上限提到 100 字，写长备注也不会被截断</li>
+                <li>修复：iPhone 上点记里程的日历图标没反应（改成点整块日期区域都能唤起选择器）</li>
+                <li>修复：里程历史只显示最近 30 条，更早的看不到</li>
+                <li>修复：点完常用备注候选词，候选行会消失，得重新点输入框才回来</li>
+                <li>修复：鸿蒙手机上有时新功能不出现（浏览器缓存了旧文件），改成优先拿最新文件，离线仍可用</li>
+            </ul>
+
             <h2>v1.8.1 · 2026-11-01</h2>
             <ul>
                 <li>新增：记账时可以点「常用备注」候选词，一键填「余额：」「单价： 元/L」，点一下是追加不会覆盖，光标自动停在要填数字的位置；候选词可自己增删、调顺序</li>
@@ -2807,6 +2991,10 @@
             <div class="empty-msg">📭 当天暂无记录</div>
         </div>
         <div class="add-form">
+            <div class="edit-bar" id="editBar" style="display:none">
+                <span>✏️ 正在修改这笔记录</span>
+                <button type="button" id="editCancel">取消修改</button>
+            </div>
             <div class="form-row">
                 <div class="type-toggle" id="typeToggle">
                     <button class="active-e" data-type="electric">⚡ 充电</button>
@@ -2825,7 +3013,7 @@
             <div class="quick-row" id="quickAmounts"></div>
             <div class="quick-row" id="quickNotes" style="display:none"></div>
             <div class="form-row row-note">
-                <input class="note-input" id="inputNote" type="text" placeholder="备注（选填）" maxlength="50" />
+                <textarea class="note-input" id="inputNote" rows="1" placeholder="备注（选填）" maxlength="100"></textarea>
                 <button class="submit-btn" id="submitRecord">添加</button>
             </div>
         </div>
@@ -2837,7 +3025,7 @@
         // ================================================================
         // 旧版本用过的键名，登录后可作为「旧数据」导入
         // 应用版本号：升级时只改这一处
-        const APP_VERSION = 'v1.8.1';
+        const APP_VERSION = 'v1.9.0';
 
         const LEGACY_KEY = 'hybrid_energy_records';
 
@@ -3017,6 +3205,7 @@
                     Number(p.amount) !== Number(r.amount) ||
                     (p.note || '') !== (r.note || '') ||
                     !!p.usePoints !== !!r.usePoints ||
+                    (r.chargeSite || '') !== ((p && p.chargeSite) || '') ||
                     (r.vehicleId && p.vehicleId !== r.vehicleId);
                 out.push({
                     id: r.id,
@@ -4137,6 +4326,12 @@
                 });
                 recordList.innerHTML = html;
 
+                recordList.querySelectorAll('.record-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        startEditRecord(item.dataset.id);
+                    });
+                });
+
                 recordList.querySelectorAll('.del-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => {
                         e.stopPropagation();
@@ -4156,10 +4351,13 @@
                 });
             }
 
-            inputAmount.value = '';
-            inputNote.value = '';
-            document.getElementById('usePoints').checked = false;
-            inputAmount.focus();
+            if (!editingRecordId) {
+                inputAmount.value = '';
+                inputNote.value = '';
+                document.getElementById('usePoints').checked = false;
+                inputAmount.focus();
+                autoGrowNote();
+            }
             updateTypeToggle(currentType);
             updateSubmitBtn();
             inputAmount.dataset.date = dateStr;
@@ -4189,6 +4387,11 @@
         }
 
         function updateSubmitBtn() {
+            if (editingRecordId) {
+                submitBtn.className = 'submit-btn editing';
+                submitBtn.textContent = '✓ 保存修改';
+                return;
+            }
             if (currentType === 'electric') {
                 submitBtn.className = 'submit-btn';
                 submitBtn.textContent = '⚡ 添加';
@@ -4200,6 +4403,8 @@
 
         function openSheet(dateStr) {
             selectedDate = dateStr;
+            editingRecordId = null;
+            paintEditState();
             renderSheet(dateStr);
             if (typeof renderQuickPicks === 'function') renderQuickPicks();
             currentSite = lastSite();
@@ -4216,6 +4421,7 @@
             bottomSheet.classList.remove('active');
             overlay.classList.remove('active');
             sheetOpen = false;
+            if (editingRecordId) { editingRecordId = null; paintEditState(); }
             document.body.style.overflow = '';
             if (wasOpen && window.__ovLeave) window.__ovLeave();
         }
@@ -4568,6 +4774,18 @@
             if (m && m[2].trim()) caret = next.length - m[2].length;
             inputNote.focus();
             try { inputNote.setSelectionRange(caret, caret); } catch (e) { /* 忽略 */ }
+            autoGrowNote();
+        }
+
+        /** 备注框跟着内容长高（1~3 行，超过就在框内滚动） */
+        function autoGrowNote() {
+            if (!inputNote) return;
+            try {
+                inputNote.style.height = 'auto';
+                const max = 92;
+                const h = Math.min(inputNote.scrollHeight || 0, max);
+                inputNote.style.height = (h > 0 ? h : 38) + 'px';
+            } catch (e) { /* 忽略 */ }
         }
 
         function renderNoteChips() {
@@ -4827,6 +5045,61 @@
             renderAll();
         }
 
+        // ── 年月快切（点「2026年8月」弹出） ──
+        let ymYear = null;
+        function openYmPicker() {
+            ymYear = currentYear;
+            paintYm();
+            document.getElementById('ymOverlay').classList.add('active');
+            document.getElementById('ymSheet').classList.add('active');
+            if (window.__ovEnter) window.__ovEnter();
+        }
+        function closeYmPicker() {
+            const was = document.getElementById('ymSheet').classList.contains('active');
+            document.getElementById('ymOverlay').classList.remove('active');
+            document.getElementById('ymSheet').classList.remove('active');
+            if (was && window.__ovLeave) window.__ovLeave();
+        }
+        function paintYm() {
+            const nowY = new Date().getFullYear();
+            const years = [];
+            const span = 8;
+            for (let y = nowY - span; y <= nowY + span; y++) years.push(y);
+            const yBox = document.getElementById('ymYears');
+            yBox.innerHTML = years.map((y) =>
+                '<button type="button" class="ym-year' + (y === ymYear ? ' on' : '') + '" data-y="' + y + '">' + y + '年</button>'
+            ).join('');
+            yBox.querySelectorAll('.ym-year').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    ymYear = Number(btn.dataset.y);
+                    paintYm();
+                    const on = yBox.querySelector('.ym-year.on');
+                    if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest', inline: 'center' });
+                });
+            });
+            const onYear = yBox.querySelector('.ym-year.on');
+            if (onYear && onYear.scrollIntoView) onYear.scrollIntoView({ block: 'nearest', inline: 'center' });
+
+            const mBox = document.getElementById('ymMonths');
+            const nowM = new Date().getMonth();
+            let html = '';
+            for (let m = 0; m < 12; m++) {
+                const cls = 'ym-month' +
+                    (ymYear === currentYear && m === currentMonth ? ' on' : '') +
+                    (ymYear === nowY && m === nowM ? ' now' : '');
+                html += '<button type="button" class="' + cls + '" data-m="' + m + '">' + (m + 1) + '月</button>';
+            }
+            mBox.innerHTML = html;
+            mBox.querySelectorAll('.ym-month').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    currentYear = ymYear;
+                    currentMonth = Number(btn.dataset.m);
+                    closeYmPicker();
+                    renderAll();
+                });
+            });
+        }
+
         function goToPrevYear() {
             annualYear--;
             renderAll();
@@ -4845,6 +5118,76 @@
         // ================================================================
         //  添加记录
         // ================================================================
+        // ── 编辑历史记录（只改金额/备注/类型/积分/场景，日期与车辆不动） ──
+        let editingRecordId = null;
+
+        function recordById(id) {
+            return records.find((r) => r.id === id) || null;
+        }
+
+        function startEditRecord(id) {
+            const r = recordById(id);
+            if (!r) return;
+            editingRecordId = id;
+            updateTypeToggle(r.type || 'gas');
+            inputAmount.value = String(r.amount);
+            inputNote.value = r.note || '';
+            autoGrowNote();
+            document.getElementById('usePoints').checked = !!r.usePoints;
+            currentSite = r.chargeSite || '';
+            paintSiteRow();
+            paintEditState();
+            inputAmount.focus();
+        }
+
+        function cancelEditRecord() {
+            editingRecordId = null;
+            inputAmount.value = '';
+            inputNote.value = '';
+            autoGrowNote();
+            document.getElementById('usePoints').checked = false;
+            paintEditState();
+        }
+
+        function paintEditState() {
+            const bar = document.getElementById('editBar');
+            if (bar) {
+                bar.style.display = editingRecordId ? 'flex' : 'none';
+            }
+            updateSubmitBtn();
+        }
+
+        function saveEditRecord(amount, note, usePoints) {
+            const r = recordById(editingRecordId);
+            if (!r) { editingRecordId = null; paintEditState(); return; }
+            const V = window.Vehicles;
+            const v = V && V.vehicleById ? V.vehicleById(r.vehicleId) : null;
+            if (v && V.allowedKinds && V.allowedKinds(v.type).indexOf(currentType) < 0) {
+                showToast('「' + v.name + '」是' + V.typeLabel(v.type) + '，不能记' + (currentType === 'electric' ? '充电' : '加油'), 2600);
+                return;
+            }
+            r.type = currentType;
+            r.amount = Math.round(amount * 100) / 100;
+            r.note = note;
+            r.usePoints = !!usePoints;
+            if (currentType === 'electric') {
+                if (currentSite) { r.chargeSite = currentSite; } else { delete r.chargeSite; }
+            } else {
+                delete r.chargeSite;
+            }
+            saveRecords(records);
+            const date = r.date;
+            editingRecordId = null;
+            paintEditState();
+            renderAll();
+            if (sheetOpen && selectedDate === date) renderSheet(date);
+            inputAmount.value = '';
+            inputNote.value = '';
+            autoGrowNote();
+            document.getElementById('usePoints').checked = false;
+            showToast('✅ 已保存修改');
+        }
+
         function handleAddRecord() {
             const date = inputAmount.dataset.date;
             if (!date) {
@@ -4859,6 +5202,12 @@
             }
             const note = inputNote.value.trim();
             const usePoints = document.getElementById('usePoints').checked;
+
+            // 正在编辑某条历史记录：直接覆盖保存，不再走「挑车」流程
+            if (editingRecordId) {
+                saveEditRecord(amount, note, usePoints);
+                return;
+            }
 
             const V = window.Vehicles;
             const what = currentType === 'electric' ? '充电' : '加油';
@@ -4909,6 +5258,7 @@
             inputNote.value = '';
             document.getElementById('usePoints').checked = false;
             inputAmount.focus();
+            autoGrowNote();
 
             // 记完一笔，顺手引导记里程（可在里程面板里关掉）
             if (window.Vehicles && typeof window.Vehicles.afterAddRecord === 'function') {
@@ -4973,6 +5323,9 @@
             $('#prevMonth').addEventListener('click', goToPrevMonth);
             $('#nextMonth').addEventListener('click', goToNextMonth);
             $('#todayBtn').addEventListener('click', goToToday);
+            $('#monthLabel').addEventListener('click', openYmPicker);
+            $('#ymClose').addEventListener('click', closeYmPicker);
+            $('#ymOverlay').addEventListener('click', closeYmPicker);
 
             $('#prevYearBtn').addEventListener('click', goToPrevYear);
             $('#nextYearBtn').addEventListener('click', goToNextYear);
@@ -5010,6 +5363,9 @@
 
             submitBtn.addEventListener('click', handleAddRecord);
 
+            const editCancelBtn = document.getElementById('editCancel');
+            if (editCancelBtn) editCancelBtn.addEventListener('click', cancelEditRecord);
+
             inputAmount.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
@@ -5019,7 +5375,7 @@
                 }
             });
             inputNote.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
+                if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     if (inputAmount.value.trim()) {
                         handleAddRecord();
@@ -5113,12 +5469,10 @@
             inputNote.addEventListener('focus', showNotes);
             inputNote.addEventListener('click', showNotes);
             inputNote.addEventListener('touchstart', showNotes, { passive: true });
-            inputNote.addEventListener('blur', () => {
-                setTimeout(() => {
-                    const nb = document.getElementById('quickNotes');
-                    if (nb) nb.style.display = 'none';
-                }, 180);
-            });
+            inputNote.addEventListener('input', autoGrowNote);
+            autoGrowNote();
+            // 注意：不要监听 blur 去隐藏。以前点完候选词，输入框失焦 → 180ms 后整行消失，
+            // 手机上看着就像「点了没用」。
         }
         // 切换充电/加油时刷新快捷金额
         if (typeToggle) {
@@ -5302,11 +5656,11 @@
         function closeAllOverlays() {
             try { if (typeof closeSheet === 'function') closeSheet(); } catch (e) { /* 忽略 */ }
             try { if (window.__closeAccount) window.__closeAccount(); } catch (e) { /* 忽略 */ }
-            ['vehicleSheet', 'mileageSheet', 'conflictSheet', 'pickSheet'].forEach((id) => {
+            ['vehicleSheet', 'mileageSheet', 'conflictSheet', 'pickSheet', 'ymSheet', 'askSheet'].forEach((id) => {
                 const el = document.getElementById(id);
                 if (el) el.classList.remove('active');
             });
-            ['vehicleOverlay', 'mileageOverlay', 'conflictOverlay', 'pickOverlay'].forEach((id) => {
+            ['vehicleOverlay', 'mileageOverlay', 'conflictOverlay', 'pickOverlay', 'ymOverlay', 'askOverlay'].forEach((id) => {
                 const el = document.getElementById(id);
                 if (el) el.classList.remove('active');
             });
@@ -5368,6 +5722,44 @@
             }
         }
         window.__prefs = { read: readPrefs, update: updatePrefs };
+
+        // ───────── 通用确认弹层（替代原生 confirm，兼容性/样式都可控） ─────────
+        const qid = (id) => document.getElementById(id);
+        let askResolve = null;
+        function closeAsk(result) {
+            const ov = qid('askOverlay');
+            const sh = qid('askSheet');
+            if (ov) ov.classList.remove('active');
+            if (sh) sh.classList.remove('active');
+            const fn = askResolve;
+            askResolve = null;
+            if (fn) fn(result);
+        }
+        function askConfirm(opts) {
+            const o = typeof opts === 'string' ? { message: opts } : (opts || {});
+            return new Promise(function (resolve) {
+                if (askResolve) closeAsk(false);
+                qid('askTitle').textContent = o.title || '确认';
+                const msg = qid('askMsg');
+                if (o.html) { msg.innerHTML = o.html; } else { msg.textContent = o.message || ''; }
+                const ok = qid('askOk');
+                ok.textContent = o.okText || '确定';
+                ok.classList.toggle('danger', !!o.danger);
+                qid('askCancel').textContent = o.cancelText || '取消';
+                askResolve = resolve;
+                qid('askOverlay').classList.add('active');
+                qid('askSheet').classList.add('active');
+            });
+        }
+        window.__askConfirm = askConfirm;
+        document.addEventListener('DOMContentLoaded', function () {
+            const ok = qid('askOk');
+            const cancel = qid('askCancel');
+            const ov = qid('askOverlay');
+            if (ok) ok.addEventListener('click', function () { closeAsk(true); });
+            if (cancel) cancel.addEventListener('click', function () { closeAsk(false); });
+            if (ov) ov.addEventListener('click', function () { closeAsk(false); });
+        });
 
         // 旧文件自检：新功能依赖新版 vehicles.js / supabase-sync.js，缺了就明确提示，不静默失败
         let staleWarned = false;
