@@ -1024,7 +1024,7 @@
             lines.push('本月：' + monthR.note);
         }
 
-        // 里程催记：太久没记读数，每公里就不准了
+        // 上次记录里程：平时是一行灰色小字，太久没记才变成提示条
         const remind = byId('pkRemind');
         if (remind) {
             const list = odometerOf(v.id);
@@ -1032,16 +1032,19 @@
                 remind.style.display = 'none';
             } else {
                 const days = daysBetween(list[list.length - 1].date, todayStr());
+                let label;
+                if (days <= 0) label = '今天';
+                else if (days === 1) label = '昨天';
+                else label = days + ' 天前';
+                remind.style.display = '';
+                remind.className = 'pk-remind';
+                remind.textContent = '上次记录里程 ' + label;
                 if (days > 30) {
-                    remind.style.display = '';
                     remind.className = 'pk-remind warn';
-                    remind.textContent = '⚠️ 距上次记里程 ' + days + ' 天，每公里数字会越来越不准';
+                    remind.textContent = '⚠️ 上次记录里程 ' + days + ' 天前，每公里数字会越来越不准';
                 } else if (days > 7) {
-                    remind.style.display = '';
-                    remind.className = 'pk-remind';
-                    remind.textContent = '距上次记里程 ' + days + ' 天，记得补一次读数';
-                } else {
-                    remind.style.display = 'none';
+                    remind.className = 'pk-remind due';
+                    remind.textContent = '上次记录里程 ' + label + '，记得补一次读数';
                 }
             }
         }
@@ -1133,6 +1136,25 @@
         if (mClose) mClose.addEventListener('click', closeMileageSheet);
         const odoSubmit = byId('odoSubmit');
         if (odoSubmit) odoSubmit.addEventListener('click', saveOdometer);
+
+        // 日期框右侧的日历按钮：点它调起系统日期选择器
+        const odoDateBtn = byId('odoDateBtn');
+        if (odoDateBtn) {
+            odoDateBtn.addEventListener('click', () => {
+                const input = byId('odoDate');
+                if (!input) return;
+                if (typeof input.showPicker === 'function') {
+                    try {
+                        input.showPicker();
+                        return;
+                    } catch (e) {
+                        /* 某些浏览器要求用户手势，退回 focus */
+                    }
+                }
+                input.focus();
+                input.click();
+            });
+        }
 
         const autoToggle = byId('odoAutoToggle');
         if (autoToggle) {
