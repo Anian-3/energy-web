@@ -346,6 +346,16 @@
             cursor: pointer;
         }
         .chart-legend .lg-item:not(.active) { color: #a8b3c2; }
+        /* 燃油车不能充电、纯电车不能加油：对应图例变灰且点不动 */
+        .chart-legend .lg-item.disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            color: #b8c2cf;
+        }
+        .chart-legend .lg-item.disabled .lg-box {
+            border-color: #dbe3ec;
+            background: #f1f5f9;
+        }
         .chart-legend .lg-box {
             position: relative;
             width: 15px;
@@ -2658,53 +2668,28 @@
                 <li>修复：iPhone 日历图标点不动、里程历史只剩 30 条、候选词点完消失、新版本迟迟不生效</li>
             </ul>
 
-            <h2>v1.8.1 · 2026-11-01</h2>
-            <ul>
-                <li>新增：记账时可以点「常用备注」候选词，一键填「余额：」「单价： 元/L」，点一下是追加不会覆盖，光标自动停在要填数字的位置；候选词可自己增删、调顺序</li>
-                <li>新增：车辆管理页可以调顺序（上移 / 下移），顶部车辆标签的顺序跟着变</li>
-            </ul>
-
-            <h2>v1.8.0 · 2026-11-01</h2>
+            <h2>v1.8.x · 2026-11-01</h2>
             <ul>
                 <li>改名「油电账本」，图标换新</li>
+                <li>新增：记账时可点「常用备注」候选词，一键填「余额：」「单价： 元/L」，候选词可自己增删、调顺序</li>
+                <li>新增：车辆管理页可以调顺序（上移 / 下移），顶部车辆标签的顺序跟着变</li>
                 <li>修复：月初第一天记里程后出现的异常显示 bug</li>
                 <li>部分 UI 优化</li>
             </ul>
 
-            <h2>v1.7.4 · 2026-10-31</h2>
+            <h2>v1.7.x · 2026-10-31</h2>
             <ul>
-                <li>优化年度汇总展示 UI：12 个月一次完整显示、去掉内部滚动条；年度视图隐藏「靠充电省下」和「每公里花费」两张月度卡片，只保留全年数据</li>
-                <li>修复：每日花费趋势图纵轴上限取整过粗（当月最高 ¥273 却画到 ¥500），导致曲线被压扁、上方大片留白。现在改为按当月实际最大值自适应</li>
+                <li>新增：纯电车也能看「省了多少」——车辆编辑里填「参考油耗 + 油价」，首页显示「本月比开油车省下 ¥X」</li>
+                <li>新增：充电场景可标 🏠家充 / ⚡快充 / 🏢公司，月度汇总显示占比并记住上次选择</li>
+                <li>修复：账号名大小写被忽略，现在显示你注册时输入的原样（仍不区分大小写）</li>
+                <li>优化：年度汇总 12 个月一次显示；趋势图纵轴按当月实际最大值自适应</li>
             </ul>
 
-            <h2>v1.7.1 · 2026-10-31</h2>
+            <h2>v1.6.x · 2026-10-31</h2>
             <ul>
-                <li>修复：账号名的大小写被忽略——注册时输入 <code>ALICE</code>，界面却显示 <code>alice</code>。现在显示你当初输入的原样</li>
-                <li>登录规则不变：<code>ALICE</code> 和 <code>alice</code> 仍是同一个账号，不区分大小写</li>
-            </ul>
-
-            <h2>v1.7.0 · 2026-10-31</h2>
-            <ul>
-                <li><strong>纯电车也能看「省了多少」</strong>：在车辆编辑里填「参考油耗 + 油价」，首页就会显示「本月比开油车省下 ¥X」</li>
-                <li><strong>充电场景</strong>：记账时可标 🏠家充 / ⚡快充 / 🏢公司，月度汇总显示占比，并记住上次选择</li>
-            </ul>
-
-            <h2>v1.6.2 · 2026-10-31</h2>
-            <ul>
-                <li>修复：鸿蒙上返回手势会直接退出页面；从账号面板打开月度小结一闪就消失</li>
-                <li>使用说明 / 更新日志 / 月度小结 左上角新增「‹ 返回」</li>
-            </ul>
-
-            <h2>v1.6.1 · 2026-10-31</h2>
-            <ul>
-                <li>修复：本月有电费却显示「这个月没充电」；缺纯电里程拆分时按历史比例估算</li>
-            </ul>
-
-            <h2>v1.6.0 · 2026-10-31</h2>
-            <ul>
-                <li>首次配置页可点「获取帮助」查看图文步骤</li>
-                <li>省钱卡补上计算口径说明，明细字号加大</li>
-                <li>支持浏览器返回键 / 手势返回关闭弹层；账号面板补上关闭按钮</li>
+                <li>新增：首次配置页点[获取帮助]查看图文步骤</li>
+                <li>优化：支持浏览器返回键/手势返回关闭弹窗；部分面板增加关闭按钮</li>
+                <li>修复：电费提示信息显示异常的 bug，缺纯电里程拆分时按历史比例估算</li>
             </ul>
 
             <h2>v1.5.0 · 2026-10-31</h2>
@@ -3373,8 +3358,21 @@
 
         function renderTrendLegend() {
             if (!trendLegend) return;
+            const V = window.Vehicles;
+            const allow = {
+                electric: V && V.canRecordKind ? V.canRecordKind('electric') : true,
+                gas: V && V.canRecordKind ? V.canRecordKind('gas') : true,
+            };
             trendLegend.querySelectorAll('.lg-item').forEach((btn) => {
-                btn.classList.toggle('active', !!trendVisible[btn.dataset.series]);
+                const key = btn.dataset.series;
+                const ok = allow[key] !== false;
+                const wasDisabled = btn.dataset.disabled === '1';
+                if (!ok) trendVisible[key] = false;
+                else if (wasDisabled) trendVisible[key] = true;
+                btn.dataset.disabled = ok ? '0' : '1';
+                btn.disabled = !ok;
+                btn.classList.toggle('disabled', !ok);
+                btn.classList.toggle('active', !!trendVisible[key]);
             });
         }
         const chartEmpty = $('#chartEmpty');
@@ -3518,9 +3516,8 @@
                 return;
             }
             tip.style.display = '';
-            tip.textContent = t === 'fuel'
-                ? '燃油车不能充电哦 · ' + lastRecordHint('gas')
-                : '纯电车不能加油哦 · ' + lastRecordHint('electric');
+            // 只显示「上次加油/充电 X 天前」，不再带车型说明
+            tip.textContent = lastRecordHint(t === 'fuel' ? 'gas' : 'electric');
         }
 
 
@@ -4120,9 +4117,8 @@
                 return;
             }
             tip.style.display = '';
-            tip.textContent = t === 'fuel'
-                ? '燃油车不能充电哦 · ' + lastRecordHint('gas')
-                : '纯电车不能加油哦 · ' + lastRecordHint('electric');
+            // 只显示「上次加油/充电 X 天前」，不再带车型说明
+            tip.textContent = lastRecordHint(t === 'fuel' ? 'gas' : 'electric');
         }
 
         function renderAnnualMonthList() {
@@ -5736,7 +5732,7 @@
         if (trendLegend) {
             trendLegend.addEventListener('click', (e) => {
                 const btn = e.target.closest('.lg-item');
-                if (!btn) return;
+                if (!btn || btn.disabled) return;
                 const key = btn.dataset.series;
                 trendVisible[key] = !trendVisible[key];
                 renderTrendLegend();
