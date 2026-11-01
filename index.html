@@ -753,6 +753,22 @@
         .yearly-summary-section .yearly-item .y-detail .g {
             color: var(--primary-g);
         }
+        /* 单一动力车型：只一行金额，放大一点 */
+        .yearly-summary-section .yearly-item .y-amount.single {
+            font-size: 17px;
+            margin-top: 6px;
+            white-space: nowrap;
+        }
+        .yearly-summary-section .yearly-item .y-amount.single .y-ico {
+            font-size: 12px;
+            margin-right: 2px;
+        }
+        .yearly-summary-section .yearly-item .y-amount.single.e {
+            color: var(--primary-e);
+        }
+        .yearly-summary-section .yearly-item .y-amount.single.g {
+            color: var(--primary-g);
+        }
         .yearly-summary-section .empty-yearly {
             text-align: center;
             color: var(--text-secondary);
@@ -856,9 +872,11 @@
         .record-item .left {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 8px;
             flex: 1;
             min-width: 0;
+            /* 标签再长也只在自己这半边截断，不许压到右边的积分 / 金额上 */
+            overflow: hidden;
         }
         .record-item .left .type-badge {
             font-size: 12px;
@@ -892,7 +910,7 @@
         .record-item .right {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 8px;
             flex-shrink: 0;
         }
         .record-item .veh-tag {
@@ -904,11 +922,12 @@
             border-radius: 7px;
             padding: 1px 7px;
             letter-spacing: 0.2px;
-            max-width: 7em;
+            max-width: 6.5em;
+            min-width: 0;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            flex-shrink: 0;
+            flex-shrink: 1;
         }
         .record-item .right .amount {
             min-width: 4.6em;
@@ -1951,7 +1970,12 @@
             background: #eff6ff;
             border-radius: 6px;
             padding: 1px 6px;
-            flex-shrink: 0;
+            min-width: 0;
+            max-width: 6.5em;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex-shrink: 1;
         }
         .vehicle-form .vf-pair { display: flex; gap: 8px; margin-top: 6px; }
         .vehicle-form .vf-pair input { flex: 1 1 0; min-width: 0; }
@@ -4258,14 +4282,24 @@
             let html = '<div class="yearly-grid">';
             yearlyData.forEach(item => {
                 const isCurrent = item.year === annualYear;
-                html += `
-                            <div class="yearly-item${isCurrent ? ' current' : ''}" style="${isCurrent ? 'background:#e8f0fe;' : ''}">
-                                <div class="y-year">${item.year}年</div>
-                                <div class="y-amount">${formatAmount(item.total)}</div>
+                // 只有一种动力时，卡片里只留那一行金额（原来总额和分项重复了），并放大
+                const single = showElectric && !showGas ? 'e' : (!showElectric && showGas ? 'g' : '');
+                let money;
+                if (single === 'e') {
+                    money = `<div class="y-amount single e"><span class="y-ico">⚡</span>${formatAmount(item.electric)}</div>`;
+                } else if (single === 'g') {
+                    money = `<div class="y-amount single g"><span class="y-ico">⛽</span>${formatAmount(item.gas)}</div>`;
+                } else {
+                    money = `<div class="y-amount">${formatAmount(item.total)}</div>
                                 <div class="y-detail">
                                     ${showElectric ? `<div class="e">⚡ ${formatAmount(item.electric)}</div>` : ''}
                                     ${showGas ? `<div class="g">⛽ ${formatAmount(item.gas)}</div>` : ''}
-                                </div>
+                                </div>`;
+                }
+                html += `
+                            <div class="yearly-item${isCurrent ? ' current' : ''}" style="${isCurrent ? 'background:#e8f0fe;' : ''}">
+                                <div class="y-year">${item.year}年</div>
+                                ${money}
                             </div>
                         `;
             });
