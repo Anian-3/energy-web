@@ -3,7 +3,7 @@
    策略：网络优先 + 缓存兜底。
    以前是「缓存优先」，结果服务器上已经是新版、手机上还是旧版
    （用户改了 vehicles.js、index.html，手机上却看不出变化），所以改成现在这样。 */
-const CACHE = 'er-shell-v50';
+const CACHE = 'er-shell-v52';
 const SHELL = [
   './',
   './index.html',
