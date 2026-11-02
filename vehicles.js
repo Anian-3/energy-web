@@ -1320,25 +1320,24 @@
         if (odoEditCancel) odoEditCancel.addEventListener('click', cancelEditOdometer);
         paintOdoEditState();
 
-        // 日期框右侧的日历图标：它现在是 <label for="odoDate">，
-        // 点它浏览器会自动转发成点击输入框（iOS / 安卓 / 桌面都认这一招），
-        // 而且「点输入框」本身就是用户手势，弹出的是系统原生日期选择器。
-        // 以前用 <button> + input.showPicker()，iOS Safari 上 showPicker 不生效、
-        // click() 又不是可信手势，所以点了没反应。
-        const odoDateBtn = byId('odoDateBtn');
-        if (odoDateBtn) {
-            odoDateBtn.addEventListener('click', (e) => {
-                // label 的默认转发已经够用；这里只兜住「没转发成功」的浏览器
+        // 日期框：点「日期文字」或「右侧 📅」都要弹出系统日历。
+        // 做法是在整个 .date-field 上挂一个 click 委托，**在用户手势里同步**调用
+        // showPicker()——以前把它放进 setTimeout，手势已失效，Chromium 直接抛
+        // NotAllowedError，于是 PC 上怎么点都没反应。
+        // iOS Safari 点日期框本来就会弹原生日历，重复调用反而会闪，所以跳过。
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+            || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const odoDateInput = byId('odoDate');
+        const dateField = odoDateInput && odoDateInput.closest('.date-field');
+        if (dateField) {
+            dateField.addEventListener('click', (e) => {
                 const input = byId('odoDate');
-                if (!input) return;
-                if (e.defaultPrevented) return;
-                setTimeout(() => {
-                    if (document.activeElement === input) return;
-                    input.focus();
-                    if (typeof input.showPicker === 'function') {
-                        try { input.showPicker(); } catch (err) { /* 忽略 */ }
-                    }
-                }, 0);
+                if (!input || isIOS) return;
+                if (typeof input.showPicker !== 'function') return;
+                // 点日期文字、点空白、点 📅 一律弹系统日历（PC 上这是唯一入口）
+                e.preventDefault();
+                input.focus();
+                try { input.showPicker(); } catch (err) { /* 老浏览器忽略 */ }
             });
         }
 

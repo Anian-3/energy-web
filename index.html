@@ -2442,13 +2442,17 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 0;
             border: 0;
             border-radius: 13px;
             background: #eff6ff;
             color: #2563eb;
             font-size: 17px;
+            font-family: inherit;
             line-height: 1;
             cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
             transition: background 0.2s;
         }
         .mileage-form .date-pick:active { background: #dbeafe; }
@@ -2672,7 +2676,7 @@
             </div>
             <div class="date-field">
                 <input class="note-input" id="odoDate" type="date" />
-                <label class="date-pick" for="odoDate" id="odoDateBtn" aria-label="选择日期" title="选择日期">📅</label>
+                <button type="button" class="date-pick" id="odoDateBtn" aria-label="选择日期" title="选择日期">📅</button>
             </div>
             <input class="amount-input" id="odoTotal" type="number" inputmode="numeric" placeholder="当前总里程（km）" />
             <div id="odoEvField">
@@ -2701,14 +2705,15 @@
         <div class="guide-body" id="changelogBody">
             <h2>v1.9.4 · 2026-11-02</h2>
             <ul>
-                <li>优化：本月跑得太少（不足 100 km）时不再让你去补记月初读数，改成照常给个大概值，并注明「样本太少，仅供参考」</li>
-                <li>修复：月初前一天记过读数时，仍然提示「补记月初读数」的 bug——现在只有真的缺起点读数才会提示</li>
+                <li>优化：本月跑得少于 100 km 时也给个大概的每公里金额，注明「样本太少，仅供参考」，不再让你去补记月初读数</li>
+                <li>修复：月初前一天记过读数，仍然提示「补记月初读数」</li>
+                <li>修复：电脑上点日期框、点 📅 都弹不出系统日历，补记更早的里程只能一天天往前点</li>
             </ul>
 
             <h2>v1.9.3 · 2026-11-02</h2>
             <ul>
-                <li>优化：金额记录的默认选项——燃油车只显示「加油」、纯电车只显示「充电」，打开面板就已选中，不用再自己切</li>
-                <li>修复：车辆管理页的排序、常用备注词、充电标签在手机和电脑之间不同步的 bug——现在点「立即同步」会把这些设置一起同步</li>
+                <li>优化：燃油车只显示「加油」、纯电车只显示「充电」，打开面板就选中</li>
+                <li>修复：车辆顺序、常用备注词、充电标签在手机和电脑之间不同步——点「立即同步」现在会一起同步</li>
             </ul>
 
             <h2>v1.9.2 · 2026-11-02</h2>
