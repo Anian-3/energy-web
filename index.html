@@ -3493,6 +3493,16 @@
             return '¥' + n.toFixed(2);
         }
 
+        // 汇总卡 / 历年卡这种「一眼看总额」的地方加千位分隔符，方便读五位数以上的钱。
+        // 记录行、明细、输入框、Excel 一律保持纯数字（带逗号会被当成文本，也会干扰 type=number）。
+        function formatAmountCard(n) {
+            const v = Number(n) || 0;
+            return '¥' + v.toLocaleString('zh-CN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+        }
+
         function showToast(msg, duration = 1800) {
             toast.textContent = msg;
             toast.classList.add('show');
@@ -4026,9 +4036,9 @@
         // ================================================================
         function renderMonthlySummary() {
             const { total, electric, gas, count } = calcMonthSummary(currentYear, currentMonth);
-            totalAmount.textContent = formatAmount(total);
-            electricTotal.textContent = formatAmount(electric);
-            gasTotal.textContent = formatAmount(gas);
+            totalAmount.textContent = formatAmountCard(total);
+            electricTotal.textContent = formatAmountCard(electric);
+            gasTotal.textContent = formatAmountCard(gas);
             renderMonthTitle();
             renderSummaryPanels();
             renderLastHints();
@@ -4057,7 +4067,7 @@
                     });
                     const parts = ids.map((k) => {
                         const pct = Math.round((sums[k] / totalCharged) * 100);
-                        return siteLabel(k) + ' ' + formatAmount(sums[k]) + '（' + pct + '%）';
+                        return siteLabel(k) + ' ' + formatAmountCard(sums[k]) + '（' + pct + '%）';
                     });
                     box.style.display = '';
                     box.innerHTML = '充电构成：' + parts.join(' · ');
@@ -4170,9 +4180,9 @@
         // ================================================================
         function renderAnnualSummary() {
             const { total, electric, gas } = calcYearSummary(annualYear);
-            annualTotalAmount.textContent = formatAmount(total);
-            annualElectricTotal.textContent = formatAmount(electric);
-            annualGasTotal.textContent = formatAmount(gas);
+            annualTotalAmount.textContent = formatAmountCard(total);
+            annualElectricTotal.textContent = formatAmountCard(electric);
+            annualGasTotal.textContent = formatAmountCard(gas);
             renderAnnualPanels();
             renderAnnualSaving();
             yearLabel.textContent = `${annualYear}年`;
@@ -4273,11 +4283,11 @@
             box.innerHTML =
                 '<span class="at-line">' +
                 '<span class="at-label">使用以来</span>' +
-                '<span class="at-sum">' + formatAmount(total) + '</span>' +
+                '<span class="at-sum">' + formatAmountCard(total) + '</span>' +
                 '</span>' +
                 (single
                     ? ''
-                    : '<span class="at-detail">⚡' + formatAmount(ev) + ' · ⛽' + formatAmount(gas) + '</span>');
+                    : '<span class="at-detail">⚡' + formatAmountCard(ev) + ' · ⛽' + formatAmountCard(gas) + '</span>');
         }
 
         function renderYearlySummary() {
@@ -4303,14 +4313,14 @@
                 const single = showElectric && !showGas ? 'e' : (!showElectric && showGas ? 'g' : '');
                 let money;
                 if (single === 'e') {
-                    money = `<div class="y-amount single e"><span class="y-ico">⚡</span>${formatAmount(item.electric)}</div>`;
+                    money = `<div class="y-amount single e"><span class="y-ico">⚡</span>${formatAmountCard(item.electric)}</div>`;
                 } else if (single === 'g') {
-                    money = `<div class="y-amount single g"><span class="y-ico">⛽</span>${formatAmount(item.gas)}</div>`;
+                    money = `<div class="y-amount single g"><span class="y-ico">⛽</span>${formatAmountCard(item.gas)}</div>`;
                 } else {
-                    money = `<div class="y-amount">${formatAmount(item.total)}</div>
+                    money = `<div class="y-amount">${formatAmountCard(item.total)}</div>
                                 <div class="y-detail">
-                                    ${showElectric ? `<div class="e">⚡ ${formatAmount(item.electric)}</div>` : ''}
-                                    ${showGas ? `<div class="g">⛽ ${formatAmount(item.gas)}</div>` : ''}
+                                    ${showElectric ? `<div class="e">⚡ ${formatAmountCard(item.electric)}</div>` : ''}
+                                    ${showGas ? `<div class="g">⛽ ${formatAmountCard(item.gas)}</div>` : ''}
                                 </div>`;
                 }
                 html += `
