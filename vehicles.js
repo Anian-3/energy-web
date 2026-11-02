@@ -987,6 +987,8 @@
             perKm: null, evPerKm: null, fuelPerKm: null, note: '', mode: 'cash',
             evKm: null, fuelKm: null,
             fromDate: '', fromKm: null, toDate: '', toKm: null, spendFrom: '',
+            // reason: no-reading | no-base | only-one | no-gain | too-short | tank
+            reason: '', provisional: false,
         };
         if (!v) return out;
 
@@ -1000,6 +1002,7 @@
             const totalKm = segs.reduce((s, x) => s + x.km, 0);
             const totalCost = segs.reduce((s, x) => s + x.cost, 0);
             if (!segs.length || totalKm <= 0) {
+                out.reason = 'tank';
                 out.note = '满箱法需要至少两次加油，且两次附近都记过里程';
                 return out;
             }
@@ -1031,7 +1034,7 @@
 
         // ── 现金口径 ──
         const readings = odometerOf(vehicleId);
-        if (!readings.length) { out.note = '还没有里程记录'; return out; }
+        if (!readings.length) { out.reason = 'no-reading'; out.note = '还没有里程记录'; return out; }
 
         let base = null;
         if (from) {
@@ -1058,17 +1061,16 @@
         }
 
         if (!base || !last) {
+            out.reason = 'no-base';
             out.note = from ? '本月缺少起点读数，记一次里程就能算' : '缺少里程数据';
             return out;
         }
-        if (base.id === last.id) { out.note = '区间内只有一条里程记录，再记一次才能算'; return out; }
+        if (base.id === last.id) { out.reason = 'only-one'; out.note = '区间内只有一条里程记录，再记一次才能算'; return out; }
 
         const km = Number(last.totalKm) - Number(base.totalKm);
-        if (!(km > 0)) { out.note = '里程没有增加，无法计算'; return out; }
-        if (km < 100) {
-            out.note = '行驶里程不足 100 km，参考意义不大';
-            return out;
-        }
+        if (!(km > 0)) { out.reason = 'no-gain'; out.note = '里程没有增加，检查一下读数'; return out; }
+        // 里程不足 100 km：样本太小，但分母小反而敏感，先给个大概值并标注仅供参考
+        const provisional = km < 100;
 
         const spendFrom = from || base.date;
         const recs = DB.visibleRecords().filter(
@@ -1089,6 +1091,11 @@
         out.toDate = last.date;
         out.toKm = Number(last.totalKm);
         out.spendFrom = spendFrom;
+        if (provisional) {
+            out.reason = 'too-short';
+            out.provisional = true;
+            out.note = '只跑了 ' + km + ' km，样本太少，仅供参考';
+        }
 
         if (v.type === 'hybrid') {
             const bEv = base.evKm != null ? Number(base.evKm) : null;
@@ -1163,7 +1170,8 @@
 
         const monthR = calcRange(v.id, mr.from, mr.to);
         const totalR = calcRange(v.id, '', '');
-        needMonthStartDate = monthR.ok ? '' : mr.from;
+        // 只有「真的缺起点读数」才提示补记；其余原因各说各的
+        needMonthStartDate = (!monthR.ok && monthR.reason === 'no-base') ? mr.from : '';
 
         byId('pkMonth').textContent = monthR.ok ? fmtMoney(monthR.perKm) : '—';
         byId('pkTotal').textContent = totalR.ok ? fmtMoney(totalR.perKm) : '—';
@@ -1178,6 +1186,10 @@
                 '累计 ' + fmtMoney(totalR.total) + ' ÷ ' + totalR.km + ' km = ' + fmtMoney(totalR.perKm) +
                 (totalR.mode === 'tank' ? '（满箱法 ' + totalR.fromDate + ' 起）' : '（现金口径）')
             );
+            // 累计和本月样本完全相同时（刚用不久的车），只留下面那句，避免两行重复
+            if (totalR.provisional && !(monthR.provisional && totalR.km === monthR.km)) {
+                lines.push('累计' + totalR.note);
+            }
         } else if (totalR.note) {
             lines.push('累计：' + totalR.note);
         }
@@ -1186,6 +1198,7 @@
                 '本月 ' + fmtMoney(monthR.total) + ' ÷ ' + monthR.km + ' km = ' + fmtMoney(monthR.perKm) +
                 (monthR.mode === 'tank' ? '（满箱法）' : '（现金口径）')
             );
+            if (monthR.provisional) lines.push('本月' + monthR.note);
         } else if (monthR.note) {
             lines.push('本月：' + monthR.note);
         }

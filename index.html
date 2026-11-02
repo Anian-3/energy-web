@@ -2699,6 +2699,12 @@
             <button class="guide-close" id="changelogClose" title="关闭">✕</button>
         </div>
         <div class="guide-body" id="changelogBody">
+            <h2>v1.9.4 · 2026-11-02</h2>
+            <ul>
+                <li>优化：本月跑得太少（不足 100 km）时不再让你去补记月初读数，改成照常给个大概值，并注明「样本太少，仅供参考」</li>
+                <li>修复：月初前一天记过读数时，仍然提示「补记月初读数」的 bug——现在只有真的缺起点读数才会提示</li>
+            </ul>
+
             <h2>v1.9.3 · 2026-11-02</h2>
             <ul>
                 <li>优化：金额记录的默认选项——燃油车只显示「加油」、纯电车只显示「充电」，打开面板就已选中，不用再自己切</li>
@@ -3169,7 +3175,7 @@
         // ================================================================
         // 旧版本用过的键名，登录后可作为「旧数据」导入
         // 应用版本号：升级时只改这一处
-        const APP_VERSION = 'v1.9.3';
+        const APP_VERSION = 'v1.9.4';
 
         const LEGACY_KEY = 'hybrid_energy_records';
 
@@ -6314,9 +6320,9 @@
             }, 320);
         });
     </script>
-    <script src="./guide.js?v=193"></script>
-    <script src="./vehicles.js?v=193"></script>
-    <script src="./supabase-sync.js?v=193"></script>
+    <script src="./guide.js?v=194"></script>
+    <script src="./vehicles.js?v=194"></script>
+    <script src="./supabase-sync.js?v=194"></script>
 
     <!-- ===== 首次使用：连接 Supabase ===== -->
     <div class="login-screen hidden" id="setupScreen">
