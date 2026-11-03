@@ -2703,40 +2703,39 @@
             <button class="guide-close" id="changelogClose" title="关闭">✕</button>
         </div>
         <div class="guide-body" id="changelogBody">
+            <h2>v1.9.5 · 2026-11-04</h2>
+            <ul>
+                <li>修复：省钱卡部分月份算出离谱金额（比如一个月「省下」八千多，或明明花了钱却显示没省）</li>
+            </ul>
+
             <h2>v1.9.4 · 2026-11-02</h2>
             <ul>
-                <li>优化：本月跑得少于 100 km 时也给个大概的每公里金额，注明「样本太少，仅供参考」，不再让你去补记月初读数</li>
-                <li>修复：月初前一天记过读数，仍然提示「补记月初读数」</li>
-                <li>修复：电脑上点日期框、点 📅 都弹不出系统日历，补记更早的里程只能一天天往前点</li>
+                <li>优化：本月跑得少（不足 100 km）时也给个大概的每公里金额，并注明「仅供参考」</li>
+                <li>修复：电脑上点日期框、点 📅 都弹不出系统日历，补记更早的里程很费劲</li>
             </ul>
 
             <h2>v1.9.3 · 2026-11-02</h2>
             <ul>
                 <li>优化：燃油车只显示「加油」、纯电车只显示「充电」，打开面板就选中</li>
-                <li>修复：车辆顺序、常用备注词、充电标签在手机和电脑之间不同步——点「立即同步」现在会一起同步</li>
+                <li>修复：车辆顺序、常用备注词、充电标签在手机和电脑之间不同步</li>
             </ul>
 
             <h2>v1.9.2 · 2026-11-02</h2>
             <ul>
-                <li>优化：年度汇总的「每月花费分布」改成和每日趋势一样的勾选图例，燃油车/纯电车自动禁用不能记的那一项</li>
-                <li>优化：燃油车记账时不再显示充电标签</li>
+                <li>优化：年度「每月花费分布」换成可勾选的图例，不能记的那项自动禁用</li>
                 <li>优化：调整部分 UI 布局</li>
             </ul>
 
             <h2>v1.9.1 · 2026-11-01</h2>
             <ul>
-                <li>新增：汇总卡按车型显示——混动车看电费 + 油费；燃油车只谈加油，纯电车只谈充电</li>
-                <li>新增：「本月总花费」左右加了 ‹ ›，可以直接翻到前后月份</li>
+                <li>新增：汇总卡按车型显示（混动车看电费 + 油费，燃油车只谈加油，纯电车只谈充电），并可用 ‹ › 翻月</li>
                 <li>新增：历年汇总右上角显示「使用以来」一共花了多少</li>
-                <li>新增：充电标签（家充 / 快充 / 公司）可以自己加、改名、删、调顺序，记账时点「＋」管理</li>
-                <li>优化：电费、油费前面的小圆点和金额对齐了</li>
+                <li>新增：充电标签（家充 / 快充 / 公司）可以自己加、改名、删、调顺序</li>
             </ul>
 
             <h2>v1.9.0 · 2026-11-01</h2>
             <ul>
-                <li>新增：点历史记录就能改金额、备注、类型、积分和充电场景，改完「保存修改」覆盖原来那条</li>
-                <li>新增：里程记录也能改，点列表里的任意一行回填，改完点「更新」</li>
-                <li>新增：明显不对的里程会先提醒一句，确认后再保存</li>
+                <li>新增：点历史记录就能改金额、备注、类型、积分和充电场景；里程记录也能改，改动明显不对时会先提醒一句</li>
                 <li>新增：点顶部年月可快速跳到任意月份</li>
                 <li>备注框能换行，上限提到 100 字</li>
                 <li>修复：iPhone 日历图标点不动、里程历史只剩 30 条、候选词点完消失、新版本迟迟不生效</li>
@@ -3180,7 +3179,7 @@
         // ================================================================
         // 旧版本用过的键名，登录后可作为「旧数据」导入
         // 应用版本号：升级时只改这一处
-        const APP_VERSION = 'v1.9.4';
+        const APP_VERSION = 'v1.9.5';
 
         const LEGACY_KEY = 'hybrid_energy_records';
 
@@ -5052,16 +5051,20 @@
             }
             const fuelKm = Math.max(1, km - evKm);
 
-            // 油每公里：本月油费 ÷ 本月燃油里程；本月没加油就用历史均值
+            // 油每公里一律用「长期口径」：全部历史的 油费 ÷ 燃油里程。
+            // 绝不能用本月：加油是「先付一箱钱」，一箱能跑几百公里还跨月，
+            // 单月 油费÷燃油里程 会被放大（4 月加了 ¥600 但只跑了 200 km 油 → ¥3.00/km，
+            // 全烧油被算成 ¥9000）或缩小（6 月 → ¥0.28/km，反而显示「没省下」）。
             let fuelPerKm = 0;
-            let est = false;
-            if (gasCost > 0 && fuelKm > 0) fuelPerKm = gasCost / fuelKm;
-            if (!(fuelPerKm > 0)) {
-                const h = history();
-                if (h && h.ok && h.fuelPerKm > 0) {
-                    fuelPerKm = h.fuelPerKm;
-                    est = true;
-                }
+            let rateHist = false;
+            const h = history();
+            if (h && h.ok && h.fuelPerKm > 0) {
+                fuelPerKm = h.fuelPerKm;
+                rateHist = true;
+            }
+            if (!(fuelPerKm > 0) && gasCost > 0 && fuelKm > 0) {
+                // 只有历史还凑不出区间（比如刚用第一箱油）才退回本月
+                fuelPerKm = gasCost / fuelKm;
             }
             if (!(fuelPerKm > 0)) return null;
 
@@ -5074,7 +5077,8 @@
                 evKm: evKm,
                 evRatio: kmRatio(evKm, km),
                 fuelPerKm: fuelPerKm,
-                est: est || estEv,
+                rateHist: rateHist,
+                est: rateHist || estEv,
                 noCharge: false,
             };
         }
@@ -5094,15 +5098,15 @@
             const sum = calcYearSummary(year);
             const actual = (sum.electric || 0) + (sum.gas || 0);
 
-            let fuelPerKm = r.fuelPerKm > 0 ? r.fuelPerKm : 0;
+            // 同样用长期口径的油每公里，避免某一年加油节奏不均导致金额跳变
+            let fuelPerKm = 0;
             let est = false;
-            if (!fuelPerKm) {
-                const hist = V.calcRange(vid, '', '');
-                if (hist && hist.ok && hist.fuelPerKm > 0) {
-                    fuelPerKm = hist.fuelPerKm;
-                    est = true;
-                }
+            const hist = V.calcRange(vid, '', '');
+            if (hist && hist.ok && hist.fuelPerKm > 0) {
+                fuelPerKm = hist.fuelPerKm;
+                est = true;
             }
+            if (!fuelPerKm && r.fuelPerKm > 0) fuelPerKm = r.fuelPerKm;
             if (!fuelPerKm) return null;
 
             return { saved: r.km * fuelPerKm - actual, est: est };
@@ -5152,17 +5156,22 @@
             if (formula) {
                 formula.textContent = info.isEv
                     ? '按参考油耗 ' + info.l100 + ' L/100km × 油价 ¥' + info.price + '/L 估算'
-                    : '按本月 ' + Math.round(info.km) + ' km × 油每公里 ¥' + (Math.round(info.fuelPerKm * 100) / 100).toFixed(2) +
-                        ' 估算' + (info.est ? '（油基准取自历史均值）' : '');
+                    : '按本月 ' + Math.round(info.km) + ' km × ' +
+                        (info.rateHist ? '长期油每公里 ' : '油每公里 ') +
+                        '¥' + (Math.round(info.fuelPerKm * 100) / 100).toFixed(2) +
+                        ' 估算' + (info.rateHist ? '（长期 = 全部历史 油费 ÷ 燃油里程）' : '');
             }
 
             if (head) head.textContent = info.isEv ? '💡 本月比开油车省下' : '💡 本月靠充电省下';
             const pct = Math.round(info.evRatio * 100);
+            const noSaving = !(info.saved > 0.005);
             foot.textContent = info.isEv
                 ? '本月 ' + Math.round(info.km) + ' km 全部用充电'
-                : (info.evKm > 0
-                    ? '充电跑了 ' + Math.round(info.evKm) + ' km，占 ' + pct + '%'
-                    : '这个月基本都在烧油');
+                : (noSaving
+                    ? '这个月用油偏多，没有省下'
+                    : (info.evKm > 0
+                        ? '充电跑了 ' + Math.round(info.evKm) + ' km，占 ' + pct + '%'
+                        : '这个月基本都在烧油'));
             if (bar) bar.style.width = Math.min(100, Math.max(0, pct)) + '%';
         }
 
@@ -6335,9 +6344,9 @@
             }, 320);
         });
     </script>
-    <script src="./guide.js?v=194"></script>
-    <script src="./vehicles.js?v=194"></script>
-    <script src="./supabase-sync.js?v=194"></script>
+    <script src="./guide.js?v=195"></script>
+    <script src="./vehicles.js?v=195"></script>
+    <script src="./supabase-sync.js?v=195"></script>
 
     <!-- ===== 首次使用：连接 Supabase ===== -->
     <div class="login-screen hidden" id="setupScreen">
