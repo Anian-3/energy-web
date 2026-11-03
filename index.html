@@ -258,6 +258,20 @@
             background: #e2e8f0;
         }
         /* 单一动力车型：不拆电费/油费，只给一句提示（右对齐，月度/年度一致） */
+        .summary-card .month-km {
+            margin-top: 8px;
+            font-size: 12.5px;
+            color: #64748b;
+            line-height: 1.5;
+            text-align: right;
+        }
+
+        .summary-card .month-km b {
+            font-size: 13.5px;
+            color: #334155;
+            font-weight: 700;
+        }
+
         .single-tip {
             margin-top: 10px;
             padding-top: 10px;
@@ -2705,7 +2719,8 @@
         <div class="guide-body" id="changelogBody">
             <h2>v1.9.5 · 2026-11-04</h2>
             <ul>
-                <li>修复：省钱卡部分月份算出离谱金额（比如一个月「省下」八千多，或明明花了钱却显示没省）</li>
+                <li>修复：省钱卡部分月份算出离谱金额</li>
+                <li>优化：调整部分 UI 布局</li>
             </ul>
 
             <h2>v1.9.4 · 2026-11-02</h2>
@@ -2997,6 +3012,7 @@
                 </div>
             </div>
             <div class="single-tip" id="singleTip" style="display:none"></div>
+            <div class="month-km" id="monthKm" style="display:none"></div>
             <div class="site-breakdown" id="siteBreakdown" style="display:none"></div>
         </div>
         <div id="summaryAnnual" style="display:none;">
@@ -3582,6 +3598,44 @@
                 : currentYear + '年' + (currentMonth + 1) + '月总花费';
         }
 
+        /**
+         * 本月已跑多少公里：截至本月最后一次里程读数。
+         * 放在汇总卡里，三种车型都看得到，切车不会忽有忽无。
+         */
+        function renderMonthKm() {
+            const el = document.getElementById('monthKm');
+            if (!el) return;
+            const V = window.Vehicles;
+            if (!V || typeof V.calcRange !== 'function') {
+                el.style.display = 'none';
+                return;
+            }
+            const from = monthFirst(currentYear, currentMonth);
+            const to = monthLast(currentYear, currentMonth);
+            const vid = (V.currentVehicleId && V.currentVehicleId()) || '';
+            const list = vid
+                ? [{ id: vid }]
+                : (typeof V.vehicles === 'function' ? V.vehicles() : []);
+
+            let km = 0;
+            let lastDate = '';
+            list.forEach((v) => {
+                const r = V.calcRange(v.id, from, to);
+                if (r && r.ok && r.km > 0) {
+                    km += r.km;
+                    if (r.toDate && r.toDate > lastDate) lastDate = r.toDate;
+                }
+            });
+            if (!(km > 0)) {
+                el.style.display = 'none';
+                return;
+            }
+            el.style.display = '';
+            const when = lastDate ? ' · 截至 ' + lastDate.slice(5).replace('-', '/') : '';
+            el.innerHTML =
+                '本月已跑 <b>' + Math.round(km).toLocaleString('zh-CN') + '</b> km' + when;
+        }
+
         /** 车型决定汇总卡长什么样：混动拆电/油，单一动力只给一句提示 */
         function renderSummaryPanels() {
             const t = currentVehicleType();
@@ -3589,6 +3643,7 @@
             const tip = document.getElementById('singleTip');
             const single = t === 'fuel' || t === 'ev';
             if (split) split.style.display = single ? 'none' : '';
+            renderMonthKm();
             if (!tip) return;
             if (!single) {
                 tip.style.display = 'none';
@@ -5159,7 +5214,7 @@
                     : '按本月 ' + Math.round(info.km) + ' km × ' +
                         (info.rateHist ? '长期油每公里 ' : '油每公里 ') +
                         '¥' + (Math.round(info.fuelPerKm * 100) / 100).toFixed(2) +
-                        ' 估算' + (info.rateHist ? '（长期 = 全部历史 油费 ÷ 燃油里程）' : '');
+                        ' 估算';
             }
 
             if (head) head.textContent = info.isEv ? '💡 本月比开油车省下' : '💡 本月靠充电省下';
