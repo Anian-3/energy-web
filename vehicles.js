@@ -1094,7 +1094,7 @@
         if (provisional) {
             out.reason = 'too-short';
             out.provisional = true;
-            out.note = '只跑了 ' + km + ' km，样本太少，仅供参考';
+            out.note = '只行驶了 ' + km + ' km，样本较少，仅供参考';
         }
 
         if (v.type === 'hybrid') {

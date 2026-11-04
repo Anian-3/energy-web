@@ -3599,7 +3599,7 @@
         }
 
         /**
-         * 本月已跑多少公里：截至本月最后一次里程读数。
+         * 本月行驶多少公里：截至本月最后一次里程读数。
          * 放在汇总卡里，三种车型都看得到，切车不会忽有忽无。
          */
         function renderMonthKm() {
@@ -3633,7 +3633,7 @@
             el.style.display = '';
             const when = lastDate ? ' · 截至 ' + lastDate.slice(5).replace('-', '/') : '';
             el.innerHTML =
-                '本月已跑 <b>' + Math.round(km).toLocaleString('zh-CN') + '</b> km' + when;
+                '本月行驶 <b>' + Math.round(km).toLocaleString('zh-CN') + '</b> km' + when;
         }
 
         /** 车型决定汇总卡长什么样：混动拆电/油，单一动力只给一句提示 */
