@@ -5188,7 +5188,7 @@
             if (info.noCharge) {
                 amt.textContent = '¥0.00';
                 amt.classList.add('zero');
-                det.textContent = '这个月没充电，没有省钱';
+                det.textContent = '本月未充电，无节省';
                 if (formula) formula.textContent = '';
                 foot.textContent = '';
                 if (bar) bar.style.width = '0%';
@@ -5225,7 +5225,7 @@
                 : (noSaving
                     ? '这个月用油偏多，没有省下'
                     : (info.evKm > 0
-                        ? '充电跑了 ' + Math.round(info.evKm) + ' km，占 ' + pct + '%'
+                        ? '充电行驶 ' + Math.round(info.evKm) + ' km，占 ' + pct + '%'
                         : '这个月基本都在烧油'));
             if (bar) bar.style.width = Math.min(100, Math.max(0, pct)) + '%';
         }
